@@ -13,13 +13,27 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    # 1. 解压源码压缩包
     - name: Unzip YardAccounting.zip
       run: unzip -o YardAccounting.zip
 
-    # 打印解压后的所有文件名和目录结构
-    - name: List Files
-      run: |
-        echo "=== Current Root Directory Files ==="
-        ls -la
-        echo "=== All Files in Repository ==="
-        find . -maxdepth 3
+    # 2. 配置 Java 17 环境
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    # 3. 安装 Gradle 并直接构建 APK（无需 gradlew）
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+
+    - name: Build Debug APK
+      run: gradle assembleDebug
+
+    # 4. 上传打包出来的 APK
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug
+        path: app/build/outputs/apk/debug/*.apk
