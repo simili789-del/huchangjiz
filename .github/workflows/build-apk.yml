@@ -25,14 +25,12 @@ jobs:
 
     - name: Make gradlew executable
       run: chmod +x gradlew
-      working-directory: YardAccounting
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug
-      working-directory: YardAccounting
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: app-debug
-        path: YardAccounting/app/build/outputs/apk/debug/*.apk
+        path: app/build/outputs/apk/debug/*.apk
