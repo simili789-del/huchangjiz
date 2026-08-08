@@ -13,15 +13,26 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    # 解压并把文件夹内的所有文件移动到根目录
+    # 1. 解压压缩包
     - name: Unzip YardAccounting.zip
+      run: unzip -o YardAccounting.zip
+
+    # 2. 自动寻找 gradlew 所在的目录，并将所有源码提升到根目录
+    - name: Find and Move Project Files
       run: |
-        unzip -o YardAccounting.zip
-        if [ -d "YardAccounting" ]; then
-          cp -r YardAccounting/* .
-          rm -rf YardAccounting
+        GRADLEW_PATH=$(find . -name "gradlew" -not -path "./.github/*" | head -n 1)
+        if [ -n "$GRADLEW_PATH" ]; then
+          DIR=$(dirname "$GRADLEW_PATH")
+          if [ "$DIR" != "." ]; then
+            echo "Found gradlew in $DIR, moving files to root..."
+            cp -r "$DIR"/* .
+          fi
+        else
+          echo "gradlew not found!"
+          exit 1
         fi
 
+    # 3. 设置 Java 环境
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -29,12 +40,15 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+    # 4. 赋予执行权限
     - name: Make gradlew executable
       run: chmod +x gradlew
 
+    # 5. 执行编译
     - name: Build Debug APK
       run: ./gradlew assembleDebug
 
+    # 6. 上传 APK 产物
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
