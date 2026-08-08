@@ -24,14 +24,17 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # 3. 安装 Gradle 并直接构建 APK（无需 gradlew）
+    # 3. 指定使用 Gradle 8.5 解决兼容性冲突
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.5'
 
+    # 4. 执行打包构建
     - name: Build Debug APK
       run: gradle assembleDebug
 
-    # 4. 上传打包出来的 APK
+    # 5. 上传打包出来的 APK
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
