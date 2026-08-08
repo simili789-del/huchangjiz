@@ -13,12 +13,9 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    # 解压压缩包并移动文件到仓库根目录
+    # 直接解压压缩包到根目录
     - name: Unzip YardAccounting.zip
-      run: |
-        unzip -o YardAccounting.zip
-        cp -r YardAccounting/* .
-        rm -rf YardAccounting
+      run: unzip -o YardAccounting.zip
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
