@@ -13,7 +13,6 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    # 直接解压压缩包到根目录
     - name: Unzip YardAccounting.zip
       run: unzip -o YardAccounting.zip
 
@@ -26,12 +25,14 @@ jobs:
 
     - name: Make gradlew executable
       run: chmod +x gradlew
+      working-directory: YardAccounting
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug
+      working-directory: YardAccounting
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: app-debug
-        path: app/build/outputs/apk/debug/*.apk
+        path: YardAccounting/app/build/outputs/apk/debug/*.apk        path: app/build/outputs/apk/debug/*.apk
