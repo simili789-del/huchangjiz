@@ -50,15 +50,20 @@ jobs:
       - name: 安装编译所需 platform-34 与 build-tools 34.0.0
         # 注意：setup-android 默认只装 tools+platform-tools，不含 platform/build-tools，
         # 这两个必须由 sdkmanager 显式安装，否则 assembleDebug 报“找不到 SDK 平台”而失败
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       - name: 授权 gradlew 执行权限
         run: chmod +x gradlew
 
       - name: 构建 debug APK（始终执行）
-        run: ./gradlew assembleDebug --no-daemon
+        continue-on-error: true
+        run: |
+          ./gradlew assembleDebug --no-daemon 2>&1 | tee build.log
 
       - name: 上传 debug APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
@@ -66,18 +71,26 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # ===== 把 APK 提交到 builds 分支，便于通过 raw 代理直接下载 =====
-      - name: 发布 APK 到 builds 分支（供下载）
+      # ===== 把 APK / 构建日志 提交到 builds 分支，便于通过 raw 代理直接下载 =====
+      # 无论构建成功与否都执行：成功则提交 APK，失败则提交 build.log（便于排错）
+      - name: 发布到 builds 分支（APK 或诊断日志）
+        if: always()
         run: |
-          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
-          cp "$APK" app-debug.apk
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
           git branch -D builds 2>/dev/null || true
           git checkout --orphan builds
           git rm -rf --cached . >/dev/null 2>&1 || true
-          git add -f app-debug.apk
-          git commit -m "build: app-debug.apk $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          APK=$(ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
+          if [ -n "$APK" ]; then
+            cp "$APK" app-debug.apk
+            git add -f app-debug.apk
+            git commit -m "build: SUCCESS app-debug.apk $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+          else
+            echo "BUILD_FAILED: APK 未生成，附上构建日志 build.log" > build_status.txt
+            git add -f build.log build_status.txt 2>/dev/null || true
+            git commit -m "build: FAILED $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+          fi
           git push --force "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" builds
 
       # ===== 在线出「已签名」release APK =====
