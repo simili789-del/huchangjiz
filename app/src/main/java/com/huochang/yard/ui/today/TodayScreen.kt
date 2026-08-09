@@ -8,7 +8,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pointerInput
+import androidx.compose.foundation.gestures.pointerInput
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.gestures.awaitPointerEventScope
@@ -23,7 +23,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
 import androidx.compose.ui.Alignment
 import com.huochang.yard.ui.theme.*
 import androidx.compose.ui.Modifier
