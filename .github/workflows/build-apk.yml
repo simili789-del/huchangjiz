@@ -24,9 +24,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-# 最小权限原则：仅读取仓库内容即可，避免安全扫描报 "excess permissions"
+# 需要 contents: write 才能把构建好的 APK 推送到 builds 分支供下载
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -69,6 +69,20 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      # ===== 把 APK 提交到 builds 分支，便于通过 raw 代理直接下载 =====
+      - name: 发布 APK 到 builds 分支（供下载）
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          cp "$APK" app-debug.apk
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git branch -D builds 2>/dev/null || true
+          git checkout --orphan builds
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          git add -f app-debug.apk
+          git commit -m "build: app-debug.apk $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push --force "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" builds
 
       # ===== 在线出「已签名」release APK =====
       # 仅当仓库配置了签名 Secrets 才执行；未配置则自动跳过，不会产生报错。
