@@ -10,13 +10,14 @@
 #   - 未配置 Secrets 时只出 debug 包，不会报错
 #
 # 加固记录 (2026-08-09):
-#   1) 将无效的 `target: 34` 改为正确的 `build-tools: '34.0.0'（原参数被 setup-android 静默忽略，
-#      导致云端缺少 build-tools 而 assembleDebug 失败）
-#   2) 增加 `permissions: contents: read`（最小权限，降低安全扫描告警）
-#   3) 超时从 30 分钟提升到 45 分钟（避免首次构建超时红叉）
+#   1) setup-android 默认只装 tools+platform-tools，不含 platform/build-tools；
+#      必须用 sdkmanager 显式安装 platforms;android-34 与 build-tools;34.0.0，否则 assembleDebug 失败
+#   2) permissions 设为 contents: write，以便把 APK 推送到 builds 分支供下载
+#   3) 超时 45 分钟（避免首次冷构建超时）
 #   4) 构建命令加 `--no-daemon`（CI 环境避免 Gradle daemon 残留）
 #   5) 产物增加 `retention-days: 14`（控制存储占用）
-#   6) 新增「条件签名 release」：仅当 secrets.KEYSTORE_BASE64 非空才签名出包，未配置则跳过（不报错）
+#   6) 构建后把 APK 提交到 builds 分支，便于通过 raw 代理直接下载（绕过受限的 GitHub API）
+#   7) 新增「条件签名 release」：仅当 secrets.KEYSTORE_BASE64 非空才签名出包，未配置则跳过（不报错）
 name: Build APK
 
 on:
@@ -43,18 +44,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: 设置 Android SDK（自动接受许可证）
+      - name: 设置 Android SDK（基础工具：cmdline-tools + platform-tools）
         uses: android-actions/setup-android@v3
-        with:
-          api-level: 34
-          # 注意：setup-android 不识别 `target` 参数，必须用 `build-tools`
-          # 项目未显式声明 buildToolsVersion，云端必须显式安装，否则 assembleDebug 失败
-          build-tools: '34.0.0'
 
-      - name: 设置 Gradle 8.2（复用项目 wrapper 版本，自动缓存依赖）
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.2'
+      - name: 安装编译所需 platform-34 与 build-tools 34.0.0
+        # 注意：setup-android 默认只装 tools+platform-tools，不含 platform/build-tools，
+        # 这两个必须由 sdkmanager 显式安装，否则 assembleDebug 报“找不到 SDK 平台”而失败
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       - name: 授权 gradlew 执行权限
         run: chmod +x gradlew
