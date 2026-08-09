@@ -146,9 +146,89 @@ REPO_VISIBILITY=public ./push_to_github.sh       # 改为公开仓库
 2. 进入仓库 **Actions → Build APK**，等待运行完成（约 3–5 分钟）。
 3. 在运行结果的 **Artifacts** 里下载 `app-debug.apk`，传到手机安装即可。
 
-> 默认出 **debug APK**（可直接安装测试，无需签名）。若要**签名 release APK** 上架，
-> 按 workflow 文件底部的注释，在仓库 `Settings → Secrets` 配置 `KEYSTORE_BASE64` 等后用
-> `assembleRelease`（脚本已写好，取消注释即可）。
+> 默认出 **debug APK**（可直接安装测试，无需签名）。若想要**你自己密钥签名的 release 包**
+> （可上架 / 正式分发），见下方「在线出已签名 APK」一节。
+
+---
+
+## 在线构建 APK（Codemagic，另一种选择）
+
+如果你嫌 GitHub Actions 总报错，本项目也内置了 `codemagic.yaml`，支持在 **Codemagic** 平台在线出包：
+
+| 工作流 | 作用 | 是否需要签名 |
+|---|---|---|
+| **Yard Debug APK** | 出 debug 测试包 | 否 |
+| **Yard Signed Release APK** | 出签名 release 包 | 是（在 Codemagic 上传 keystore） |
+
+详细步骤（上传 keystore、运行构建、下载 APK）见 **《Codemagic使用说明.md》**。
+
+---
+
+## 🔐 在线出已签名 APK（GitHub Actions，免本地签名）
+
+> 嫌下面步骤太简略？同目录有 **《在线签名详细教程.md》** —— 专门给不熟命令的同学准备的图文版（含 Android Studio 图形生成密钥、GitHub 网页填 Secrets 逐屏指引）。
+
+workflow 已内置**条件签名**：你在仓库配置好签名密钥后，云端会自动额外产出一个用你自己的
+密钥签名的 `app-release.apk`；**没配置则只出 debug 包，不会报错**。全程无需本机装 Android Studio 签名。
+
+### 准备一次（只需做一次）
+
+**① 生成 keystore**（JDK 自带 `keytool`，或用 Android Studio 的 `Build → Generate Signed Bundle / APK`）：
+```bash
+keytool -genkey -v -keystore release.keystore -alias yardrelease \
+        -keyalg RSA -keysize 2048 -validity 10000
+```
+> Windows 用户建议在 **Git Bash** 里跑这条命令；过程中会让你设密码并填一些信息，
+> **密码务必牢记**（alias 默认用 `yardrelease`）。
+
+**② 转成 base64 文本**：
+```bash
+base64 -w0 release.keystore > release.keystore.b64
+```
+> Windows 没有 `base64` 命令时，用 Git Bash 跑上面这条；或用
+> `certutil -encode release.keystore release.keystore.b64` 后删掉首尾两行再合并为一行。
+
+**③ 填进 GitHub Secrets**：仓库 `Settings → Secrets and variables → Actions → New repository secret`，
+添加以下 4 条：
+
+| Secret 名称 | 值 |
+|------|-----|
+| `KEYSTORE_BASE64` | `release.keystore.b64` 的**全部内容**（一整段） |
+| `KEY_ALIAS` | `yardrelease` |
+| `KEY_PASSWORD` | 你第①步设的**密钥密码** |
+| `STORE_PASSWORD` | 你第①步设的**库密码** |
+
+### 之后怎么用
+推送代码后，进入仓库 **Actions → Build APK**，运行结束会在 **Artifacts** 里多出 `app-release`
+（已签名，可上架/正式分发），同时仍有 `app-debug`。
+
+> ⚠️ **密钥安全**：`release.keystore` 和那段 base64 文本**等同于你的签名身份**——
+> 务必在本地备份好（**丢失将无法更新已上架的 App**），且**绝对不要提交进仓库**
+> （已在 `.gitignore` 忽略 `keystore/` 与 `local.properties`）。
+
+---
+
+## 不想用 GitHub 云端构建？本地出包 + 手动传 Release
+
+如果你遇到 GitHub Actions 构建报错、或单纯不想依赖云端编译，完全可以**不在 GitHub 上构建**——
+在自己电脑上编译好 APK，再把成品传到 GitHub 的 **Release** 里当"网盘"用。GitHub 只负责存代码和分发，
+**不会触发任何构建检查**，自然没有 Actions 红叉。
+
+### 步骤一：本机出包（任选一种）
+- **Android Studio（最省心）**：打开项目 → 等同步完成 → 菜单
+  `Build → Build Bundle(s) / APK(s) → Build APK`，右下角弹窗点 `locate` 即可拿到
+  `app/build/outputs/apk/debug/app-debug.apk`。
+- **命令行**：本机配好 Android SDK 后执行 `./gradlew assembleDebug`（或用 `./build_and_sign.sh`
+  出签名版 release APK，见上方"方式二"）。
+
+### 步骤二：手动传到 GitHub Release
+1. 打开你的 GitHub 仓库页面 → 右侧 **Releases → Draft a new release**。
+2. 填个版本号（如 `v1.0-debug`），把上一步的 `app-debug.apk` 拖进附件区。
+3. 点 **Publish release**，别人就能在 Release 页面直接下载安装。
+
+> 这样 GitHub 一次构建都没跑，所有 Actions 报错都不会出现。仓库里常见的 **Dependabot 漏洞提示**
+> 属于"依赖体检"而非编译错误（提醒你升级第三方库版本），可单独决定是否处理，不影响你出包安装。
+> 若想彻底关掉自动构建，删除 `.github/workflows/build-apk.yml` 即可。
 
 ---
 

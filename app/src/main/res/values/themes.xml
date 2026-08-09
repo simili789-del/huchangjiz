@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base theme. We use a transparent status bar so the Compose UI draws edge-to-edge. -->
+    <style name="Theme.YardAccounting" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+    </style>
+</resources>
