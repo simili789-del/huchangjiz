@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewModelScope
 import com.huochang.yard.data.model.WorkType
 import com.huochang.yard.data.model.YardRecord
 import com.huochang.yard.ui.BaseYardViewModel

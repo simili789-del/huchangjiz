@@ -9,6 +9,7 @@ import com.huochang.yard.ui.BaseYardViewModel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import androidx.lifecycle.viewModelScope
 
 class SettingsViewModel(application: Application) : BaseYardViewModel(application) {
 

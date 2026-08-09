@@ -7,6 +7,7 @@ import com.huochang.yard.data.local.entities.*
 import com.huochang.yard.data.model.*
 import com.huochang.yard.util.recordCars
 import com.huochang.yard.util.recordMoney
+import com.huochang.yard.util.priceMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
@@ -379,7 +380,7 @@ class YardRepository(private val db: AppDatabase) {
     }
 
     private fun genId(): String =
-        "R" + System.currentTimeMillis().toString(36) + UUID.randomUUID().toString(36).substring(2, 6)
+        "R" + System.currentTimeMillis().toString(36) + UUID.randomUUID().toString().replace("-", "").substring(0, 4)
 
     private fun q(s: String) = "\"$s\""
     private fun f(d: Double) = "%.2f".format(d)

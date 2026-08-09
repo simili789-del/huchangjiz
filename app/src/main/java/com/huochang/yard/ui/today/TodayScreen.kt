@@ -11,7 +11,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pointerInput
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.awaitPointerEventScope
+import androidx.compose.foundation.gestures.awaitPointerEventScope
+import androidx.compose.foundation.gestures.awaitPointerEvent
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -390,9 +393,9 @@ private fun StepperRow(
                         var lastTap = 0L
                         awaitPointerEventScope {
                             while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.InitialPass)
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
                                 val change = event.changes.firstOrNull() ?: continue
-                                if (change.pressed) {
+                                if (change.changedToDown()) {
                                     val now = System.currentTimeMillis()
                                     if (now - lastTap in 1..300) {
                                         onSet(0)

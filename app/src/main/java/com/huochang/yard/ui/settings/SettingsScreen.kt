@@ -153,7 +153,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     viewModel.addType(newTypeName, newTypePrice.toDoubleOrNull() ?: 0.0)
                     newTypeName = ""; newTypePrice = ""
                     scope.toast("已添加作业类型")
-                }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, bottom = 12.dp).height(40.dp), shape = MaterialTheme.shapes.small) { Text("添加类型") }
+                }, modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp).height(40.dp), shape = MaterialTheme.shapes.small) { Text("添加类型") }
             }
         }
 
