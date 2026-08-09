@@ -1,0 +1,52 @@
+# Codemagic 在线构建配置
+# 说明：
+#   - yard-debug：始终构建 debug APK，无需签名，肯定成功
+#   - yard-release：构建签名 release APK，需先在 Codemagic 上传 keystore 并命名为 yard_keystore
+#   - 若没上传 keystore，只跑 yard-debug 即可；release 工作流会依赖签名配置
+workflows:
+  yard-debug:
+    name: Yard Debug APK
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      vars:
+        GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dkotlin.compiler.execution.strategy='in-process'"
+    scripts:
+      - name: 设置 Android SDK 路径
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+      - name: 授权 gradlew
+        script: chmod +x gradlew
+      - name: 构建 debug APK
+        script: ./gradlew assembleDebug --no-daemon
+    artifacts:
+      - app/build/outputs/apk/debug/*.apk
+
+  yard-release:
+    name: Yard Signed Release APK
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      android_signing:
+        - yard_keystore   # 需在 Codemagic Team 设置中上传 keystore，命名为 yard_keystore
+      vars:
+        GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dkotlin.compiler.execution.strategy='in-process'"
+    scripts:
+      - name: 设置 Android SDK 路径与签名配置
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+          # 将 Codemagic 注入的签名变量写入 local.properties，让 app/build.gradle.kts 能读到
+          if [ -n "$CM_KEYSTORE_PATH" ]; then
+            {
+              echo "storeFile=$CM_KEYSTORE_PATH"
+              echo "storePassword=$CM_KEYSTORE_PASSWORD"
+              echo "keyAlias=$CM_KEY_ALIAS"
+              echo "keyPassword=$CM_KEY_PASSWORD"
+            } >> "$CM_BUILD_DIR/local.properties"
+          fi
+      - name: 授权 gradlew
+        script: chmod +x gradlew
+      - name: 构建签名 release APK
+        script: ./gradlew assembleRelease --no-daemon
+    artifacts:
+      - app/build/outputs/apk/release/*.apk
