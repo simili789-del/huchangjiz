@@ -1,7 +1,0 @@
-<resources>
-    <string name="app_name">货场作业记账</string>
-    <string name="nav_today">今日</string>
-    <string name="nav_details">明细</string>
-    <string name="nav_report">月报</string>
-    <string name="nav_settings">设置</string>
-</resources>

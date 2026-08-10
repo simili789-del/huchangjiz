@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Tint color used by the launcher (matches default app blue #007AFF) -->
-    <color name="ic_launcher_background">#007AFF</color>
-</resources>

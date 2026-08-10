@@ -1,32 +1,17 @@
-# Built application files
-*.apk
-*.aar
-*.ap_
-*.aab
+# Capacitor 自动生成的原生工程（CI 中由 `npx cap add android` 实时生成，不入库）
+android/
 
-# Keystore / signing (NEVER commit your release key!)
-keystore/
+# Node 依赖
+node_modules/
+
+# 密钥 / 本地配置
 *.keystore
-*.jks
 local.properties
-signing.properties
 
-# Gradle / build output
-.gradle/
-build/
-app/build/
-captures/
-.externalNativeBuild/
-.cxx/
-
-# IDE
-.idea/
-*.iml
-*.ipr
-*.iws
+# 系统文件
 .DS_Store
 Thumbs.db
 
-# Log / temp
-*.log
-/artifacts/
+# Python 缓存
+__pycache__/
+*.pyc

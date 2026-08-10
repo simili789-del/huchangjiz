@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+<title>货场作业记账</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#F2F2F7">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="hc-header">
+    <div>
+      <h1 id="siteTitle">货场作业记账</h1>
+      <div class="site-name" id="siteSubtitle">未设置货场名称</div>
+    </div>
+    <div id="headerBadge" class="small-muted"></div>
+  </header>
+
+  <main class="hc-main">
+
+    <!-- 今日 Tab -->
+    <section id="tab-today" class="tab-panel active">
+      <div id="editBanner" class="banner" style="display:none;">
+        <span>正在编辑记录...</span>
+        <span id="cancelEditBtn" style="cursor:pointer;">取消</span>
+      </div>
+
+      <div class="card">
+        <div class="grid-2">
+          <div class="field"><label>日期</label><input type="date" id="f_date"></div>
+          <div class="field"><label>班次</label>
+            <div class="segmented" id="f_shift">
+              <div class="seg-item day active" data-val="day">☀️ 白班</div>
+              <div class="seg-item night" data-val="night">🌙 夜班</div>
+            </div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>姓名</label><input type="text" id="f_name" placeholder="请输入姓名"></div>
+          <div class="field"><label>车号</label><input type="text" id="f_car" placeholder="请输入车号"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">作业车数</div>
+        <div id="stepperList"></div>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn block" id="saveBtn">保存 · ¥0.00</button>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">今日车数</div>
+          <div id="todayCount" style="font-size:28px;font-weight:700;">0</div>
+          <div class="small-muted" id="todayShiftBreak">白 0 · 夜 0</div>
+          <div style="height:6px;background:var(--bg);border-radius:4px;margin-top:8px;overflow:hidden;">
+            <div id="goalBar" style="height:100%;background:var(--blue);width:0%;"></div>
+          </div>
+          <div class="small-muted" id="goalText" style="margin-top:4px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">今日收入</div>
+          <div id="todayIncome" style="font-size:28px;font-weight:700;color:var(--green);">¥0.00</div>
+          <div class="small-muted" id="yesterdaySum">昨日：0车 / ¥0.00</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="card-title" style="margin:0;">昨天作业类型车数</div>
+          <span style="color:var(--blue);font-size:13px;cursor:pointer;" id="copyYesterdayBtn">复制昨日</span>
+        </div>
+        <div id="yesterdayDetail"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">今日记录 (<span id="todayRecCount">0</span>)</div>
+        <div id="todayRecords"></div>
+      </div>
+    </section>
+
+    <!-- 明细 Tab -->
+    <section id="tab-detail" class="tab-panel">
+      <div class="card">
+        <div class="card-title">近7天车数矩阵</div>
+        <div id="matrix7"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">筛选</div>
+        <div class="chip-row" id="quickFilters">
+          <div class="chip active" data-range="today">今天</div>
+          <div class="chip" data-range="7d">近7天</div>
+          <div class="chip" data-range="month">本月</div>
+          <div class="chip" data-range="lastmonth">上月</div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>开始日期</label><input type="date" id="rangeStart"></div>
+          <div class="field"><label>结束日期</label><input type="date" id="rangeEnd"></div>
+        </div>
+        <div class="field"><label>班次</label>
+          <div class="segmented" id="filterShift">
+            <div class="seg-item active" data-val="all">全部</div>
+            <div class="seg-item day" data-val="day">白班</div>
+            <div class="seg-item night" data-val="night">夜班</div>
+          </div>
+        </div>
+        <div class="field"><label>搜索姓名 / 车号</label><input type="text" id="searchKw" placeholder="输入关键词"></div>
+        <div class="row">
+          <span class="small-muted">排序</span>
+          <select id="sortOrder" style="width:auto;height:34px;">
+            <option value="desc">日期降序</option>
+            <option value="asc">日期升序</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div>共 <b id="sumCount">0</b> 车</div>
+          <div style="color:var(--green);font-weight:700;">¥<span id="sumAmount">0.00</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="card-title" style="margin:0;">记录列表</div>
+          <span style="color:var(--blue);font-size:13px;cursor:pointer;" id="exportCsvBtn">导出CSV</span>
+        </div>
+        <div id="detailRecords"></div>
+      </div>
+      <div class="batch-bar" id="batchBar" style="display:none;">
+        <span>已选择 <b id="batchCount">0</b> 条</span>
+        <div class="actions">
+          <span class="export" id="batchExport">导出CSV</span>
+          <span class="del" id="batchDelete">删除</span>
+          <span id="batchCancel">取消</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 月报 Tab -->
+    <section id="tab-report" class="tab-panel">
+      <div class="card">
+        <div class="grid-2">
+          <div class="field"><label>月份</label><input type="month" id="reportMonth"></div>
+          <div class="field"><label>人员</label><select id="reportPerson"><option value="">全部人员</option></select></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">摘要核算（按单价）</div>
+        <div id="priceSummary"></div>
+        <div class="section-divider"></div>
+        <div class="row"><span>月度计件收入</span><b id="pieceIncome">¥0.00</b></div>
+        <div class="row" style="margin-top:6px;"><span style="font-weight:700;">预估总工资</span><b id="totalSalary" style="color:var(--green);font-size:18px;">¥0.00</b></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">每日车数</div>
+        <div class="bar-chart" id="barChart"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">作业类型分布</div>
+        <div id="typeDist"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">按人员统计</div>
+        <div id="personStats"></div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <span>导出本月CSV</span>
+          <button class="btn small" id="exportMonthCsv">导出</button>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <span>导出工资单CSV</span>
+          <button class="btn small" id="exportPayrollCsv">导出</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 设置 Tab -->
+    <section id="tab-settings" class="tab-panel">
+      <div class="card">
+        <div class="card-title">个人信息</div>
+        <div class="field"><label>默认姓名</label><input type="text" id="s_name"></div>
+        <div class="field"><label>默认车号</label><input type="text" id="s_car"></div>
+        <div class="field"><label>货场名称</label><input type="text" id="s_site"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">作业类型 & 单价（元/车）</div>
+        <div id="typeManageList"></div>
+        <div class="section-divider"></div>
+        <div class="grid-2">
+          <input type="text" id="newTypeName" placeholder="新类型名称" style="height:40px;border-radius:10px;border:1px solid var(--border);background:var(--bg);padding:0 10px;">
+          <input type="number" id="newTypePrice" placeholder="单价" style="height:40px;border-radius:10px;border:1px solid var(--border);background:var(--bg);padding:0 10px;">
+        </div>
+        <button class="btn small block" id="addTypeBtn" style="margin-top:10px;">添加类型</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">工资构成设置</div>
+        <div class="grid-2">
+          <div class="field"><label>基本底薪</label><input type="number" id="sal_base"></div>
+          <div class="field"><label>餐补</label><input type="number" id="sal_meal"></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>加班</label><input type="number" id="sal_night"></div>
+          <div class="field"><label>工龄/奖金</label><input type="number" id="sal_bonus"></div>
+        </div>
+        <div class="field"><label>扣款</label><input type="number" id="sal_deduct"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">目标设置</div>
+        <div class="grid-2">
+          <div class="field"><label>日目标车数</label><input type="number" id="goal_day"></div>
+          <div class="field"><label>月目标车数</label><input type="number" id="goal_month"></div>
+        </div>
+        <div class="row">
+          <span>隐藏金额（隐私模式）</span>
+          <label class="switch"><input type="checkbox" id="hideAmtSwitch"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">主题颜色</div>
+        <div class="color-picker" id="colorPicker"></div>
+        <div class="section-divider"></div>
+        <div class="row">
+          <span>外观模式</span>
+          <select id="themeMode" style="width:auto;height:34px;">
+            <option value="system">跟随系统</option>
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">数据管理</div>
+        <div class="grid-2">
+          <button class="btn small" id="exportJsonBtn">导出JSON备份</button>
+          <button class="btn small secondary" id="importJsonBtn">导入JSON</button>
+        </div>
+        <div class="grid-2" style="margin-top:8px;">
+          <button class="btn small" id="exportCsvBtn2">导出CSV</button>
+          <button class="btn small secondary" id="importCsvBtn">导入CSV</button>
+        </div>
+        <div class="grid-2" style="margin-top:8px;">
+          <button class="btn small secondary" id="loadSampleBtn">载入示例数据</button>
+          <button class="btn small danger" id="clearAllBtn">清空所有数据</button>
+        </div>
+        <input type="file" id="fileInput" accept=".json,.csv" style="display:none;">
+      </div>
+
+      <div class="small-muted" style="text-align:center;padding:10px 0;">货场作业记账 v1.0.0</div>
+    </section>
+
+  </main>
+
+  <nav class="tabbar">
+    <div class="tab-item active" data-tab="today"><div class="tab-icon">📝</div>今日</div>
+    <div class="tab-item" data-tab="detail"><div class="tab-icon">📋</div>明细</div>
+    <div class="tab-item" data-tab="report"><div class="tab-icon">📊</div>月报</div>
+    <div class="tab-item" data-tab="settings"><div class="tab-icon">⚙️</div>设置</div>
+  </nav>
+
+  <div id="toast"></div>
+
+  <div class="sheet-overlay" id="sheetOverlay">
+    <div class="sheet" id="sheetContent"></div>
+  </div>
+
+</div>
+
+<script src="js/app.js"></script>
+<script>
+  // PWA: Service Worker 注册（仅在支持的环境下，Android WebView 中同样有效）
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>

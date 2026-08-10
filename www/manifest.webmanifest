@@ -1,0 +1,11 @@
+{
+  "name": "货场作业记账",
+  "short_name": "货场记账",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F2F2F7",
+  "theme_color": "#F2F2F7",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

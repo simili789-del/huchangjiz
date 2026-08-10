@@ -1,64 +1,98 @@
-# Codemagic 在线构建配置
-# 说明：
-#   - yard-debug：始终构建 debug APK，无需签名，肯定成功
-#   - yard-release：构建签名 release APK，需先在 Codemagic 上传 keystore 并命名为 yard_keystore
-#   - 若没上传 keystore，只跑 yard-debug 即可；release 工作流会依赖签名配置
 workflows:
-  yard-debug:
-    name: Yard Debug APK
-    instance_type: mac_mini_m2
-    max_build_duration: 60
+  huochang-release:
+    name: 货场作业记账 - 发布版
+    instance_type: linux_x2
+    max_build_duration: 30
     environment:
+      java: 17
+      node: 20
+      groups:
+        - keystore_credentials      # 在 CodeMagic 网页端创建该分组，包含下方变量
       vars:
-        GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dkotlin.compiler.execution.strategy='in-process'"
-    scripts:
-      - name: 设置 Android SDK 路径
-        script: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
-      - name: 授权 gradlew
-        script: chmod +x gradlew
-      - name: 打印依赖树（诊断 foundation/compose 实际解析版本与冲突）
-        # 直接 echo 到构建日志，确保失败日志里也可见；同时存为 artifact 便于下载。
-        # 关注点：androidx.compose.foundation 实际解析到哪个版本、是否出现 "->" 版本冲突箭头
-        # （箭头说明某传递依赖把 foundation 拉成了另一个版本，这正是手势符号缺失的可疑来源）。
-        script: |
-          echo "===== :app:dependencies debugCompileClasspath (foundation/compose) ====="
-          ./gradlew :app:dependencies --configuration debugCompileClasspath --no-daemon 2>&1 | grep -iE "foundation|compose|->|FAILED" || true
-          ./gradlew :app:dependencies --configuration debugCompileClasspath --no-daemon > "$CM_BUILD_DIR/dependency_tree.txt" 2>&1 || true
-      - name: 构建 debug APK
-        # 本次根因已锁定为 Kotlin/K2 元数据不兼容（见提交说明），随 Kotlin 升级一并解决，
-        # 不再需要 --refresh-dependencies。
-        script: ./gradlew assembleDebug --no-daemon
-    artifacts:
-      - app/build/outputs/apk/debug/*.apk
-      - dependency_tree.txt
-
-  yard-release:
-    name: Yard Signed Release APK
-    instance_type: mac_mini_m2
-    max_build_duration: 60
-    environment:
+        PACKAGE_NAME: "com.huochang.accounting"
       android_signing:
-        - yard_keystore   # 需在 Codemagic Team 设置中上传 keystore，命名为 yard_keystore
-      vars:
-        GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dkotlin.compiler.execution.strategy='in-process'"
+        - huochang_keystore          # 在 CodeMagic > Team settings > Code signing identities 上传的 Keystore 引用名
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
     scripts:
-      - name: 设置 Android SDK 路径与签名配置
+      - name: 安装 Node 依赖
         script: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
-          # 将 Codemagic 注入的签名变量写入 local.properties，让 app/build.gradle.kts 能读到
-          if [ -n "$CM_KEYSTORE_PATH" ]; then
-            {
-              echo "storeFile=$CM_KEYSTORE_PATH"
-              echo "storePassword=$CM_KEYSTORE_PASSWORD"
-              echo "keyAlias=$CM_KEY_ALIAS"
-              echo "keyPassword=$CM_KEY_PASSWORD"
-            } >> "$CM_BUILD_DIR/local.properties"
+          npm ci || npm install
+      - name: 安装 Capacitor CLI 并添加 Android 平台
+        script: |
+          if [ ! -d "android" ]; then
+            npx cap add android
           fi
-      - name: 授权 gradlew
-        script: chmod +x gradlew
-      - name: 构建签名 release APK
-        # 与 yard-debug 同理：根因已锁定为 Kotlin/K2 元数据不兼容，随 Kotlin 升级一并解决。
-        script: ./gradlew assembleRelease --no-daemon
+          npx cap sync android
+      - name: 注入权限与签名配置
+        script: |
+          python3 scripts/postcap.py
+      - name: 赋予 gradlew 执行权限
+        script: |
+          chmod +x android/gradlew
+      - name: 构建 Release APK 与 AAB
+        script: |
+          cd android
+          ./gradlew assembleRelease bundleRelease
     artifacts:
-      - app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/**/mapping.txt
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com          # 替换为你的邮箱以接收构建产物通知
+        notify:
+          success: true
+          failure: true
+
+  huochang-debug:
+    name: 货场作业记账 - 调试版
+    instance_type: linux_x2
+    max_build_duration: 30
+    environment:
+      java: 17
+      node: 20
+      vars:
+        PACKAGE_NAME: "com.huochang.accounting"
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: "*"
+          include: true
+      cancel_previous_builds: true
+    scripts:
+      - name: 安装 Node 依赖
+        script: |
+          npm ci || npm install
+      - name: 添加 Android 平台
+        script: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+      - name: 注入权限配置
+        script: |
+          python3 scripts/postcap.py
+      - name: 赋予 gradlew 执行权限
+        script: |
+          chmod +x android/gradlew
+      - name: 构建 Debug APK
+        script: |
+          cd android
+          ./gradlew assembleDebug
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com          # 替换为你的邮箱以接收构建产物通知
+        notify:
+          success: true
+          failure: true
