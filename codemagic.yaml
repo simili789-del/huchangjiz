@@ -18,7 +18,12 @@ workflows:
       - name: 授权 gradlew
         script: chmod +x gradlew
       - name: 构建 debug APK
-        script: ./gradlew assembleDebug --no-daemon
+        # --refresh-dependencies 强制重新下载所有依赖（含 androidx.compose.foundation），
+        # 绕过 Codemagic 默认 Gradle 缓存中可能损坏/不完整的 foundation AAR。
+        # 现象：foundation 顶层 API(background/clickable/LazyColumn)可解析，唯独
+        # foundation.gestures.*(pointerInput/awaitPointerEventScope/awaitPointerEvent/
+        # detectTapGestures)整体 Unresolved —— 同 AAR 部分符号缺失，典型依赖缓存损坏。
+        script: ./gradlew assembleDebug --no-daemon --refresh-dependencies
     artifacts:
       - app/build/outputs/apk/debug/*.apk
 
@@ -47,6 +52,7 @@ workflows:
       - name: 授权 gradlew
         script: chmod +x gradlew
       - name: 构建签名 release APK
-        script: ./gradlew assembleRelease --no-daemon
+        # 与 yard-debug 同理：--refresh-dependencies 强制重新下载依赖，避免 foundation 缓存损坏。
+        script: ./gradlew assembleRelease --no-daemon --refresh-dependencies
     artifacts:
       - app/build/outputs/apk/release/*.apk
