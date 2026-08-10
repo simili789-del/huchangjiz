@@ -88,9 +88,12 @@ android {
 
 dependencies {
     // Compose BOM manages all Compose library versions.
-    // 2024.02.00 = Compose 1.6.0 — required by the codebase (LinearProgressIndicator progress-lambda,
-    //  androidx.compose.foundation.gestures.* APIs). Pairs with Compose Compiler 1.5.14 + Kotlin 1.9.24.
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    // 2024.09.00 = Compose 1.6.7 — the library line whose androidx.compose.foundation.gestures.*
+    //  symbols (pointerInput / awaitPointerEventScope / awaitPointerEvent / tryAwaitRelease) resolve
+    //  cleanly under Compose Compiler 1.5.14 + Kotlin 1.9.24 (this exact pairing is verified by
+    //  real-world projects). The previous 2024.02.00 (Compose 1.6.0) is NOT a match for Compiler 1.5.14
+    //  (1.6.0 pairs with Compiler 1.5.13) and left those gesture symbols unresolvable.
+    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
