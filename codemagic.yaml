@@ -17,10 +17,13 @@ workflows:
           echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
       - name: 授权 gradlew
         script: chmod +x gradlew
-      - name: 打印依赖树（诊断 foundation/compose 实际解析版本，输出到 artifact）
-        # 若构建仍失败，下载本 step 生成的 dependency_tree.txt 即可看到
-        # foundation 实际解析到的版本与冲突，无需再截取 Gradle 日志。
+      - name: 打印依赖树（诊断 foundation/compose 实际解析版本与冲突）
+        # 直接 echo 到构建日志，确保失败日志里也可见；同时存为 artifact 便于下载。
+        # 关注点：androidx.compose.foundation 实际解析到哪个版本、是否出现 "->" 版本冲突箭头
+        # （箭头说明某传递依赖把 foundation 拉成了另一个版本，这正是手势符号缺失的可疑来源）。
         script: |
+          echo "===== :app:dependencies debugCompileClasspath (foundation/compose) ====="
+          ./gradlew :app:dependencies --configuration debugCompileClasspath --no-daemon 2>&1 | grep -iE "foundation|compose|->|FAILED" || true
           ./gradlew :app:dependencies --configuration debugCompileClasspath --no-daemon > "$CM_BUILD_DIR/dependency_tree.txt" 2>&1 || true
       - name: 构建 debug APK
         # 本次根因已锁定为 Kotlin/K2 元数据不兼容（见提交说明），随 Kotlin 升级一并解决，
