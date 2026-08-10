@@ -88,7 +88,10 @@ android {
 
 dependencies {
     // Compose BOM manages all Compose library versions
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    // 2024.01.00 = Compose 1.5.10, which matches the project's Compose Compiler 1.5.10 + Kotlin 1.9.22.
+    // (2024.02.00 = Compose 1.6.0 would require Compose Compiler 1.5.14 / Kotlin 1.9.23; paired with
+    //  Compiler 1.5.10 it made androidx.compose.foundation.gestures.* symbols unresolvable.)
+    implementation(platform("androidx.compose:compose-bom:2024.01.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
