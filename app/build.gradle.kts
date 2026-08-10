@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+    // Compose Compiler 2.0（整合进 Kotlin 2.0 插件），替代旧式 composeOptions.kotlinCompilerExtensionVersion。
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 import java.io.FileInputStream
@@ -75,10 +77,8 @@ android {
         buildConfig = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
-
+    // 注意：Compose Compiler 2.0 已整合进 Kotlin 2.0 插件（org.jetbrains.kotlin.plugin.compose），
+    // 不再需要旧式的 composeOptions.kotlinCompilerExtensionVersion。
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -87,10 +87,9 @@ android {
 }
 
 dependencies {
-    // 升级到 Compose 1.7.0 library line（仍配 Compose Compiler 1.5.14 + Kotlin 1.9.24，官方支持）。
-    // 此前的 1.6.7 线在构建环境实际解析到的 foundation 手势包残缺
-    // （gestures 包能找到但 pointerInput 等顶层符号缺失，background/clickable 在主包正常），
-    // 升级到 1.7.0 线以绕开可能损坏/不完整的 1.6.7 artifact；版本仍显式钉死，避免传递降级。
+    // Compose 1.7.0 library line，与 Kotlin 2.0.21 + Compose Compiler 2.0（K2 编译器）配套：
+    // 1.7.0 库用 Kotlin 2.0 (K2 元数据) 编译，旧 K1 编译器 (1.9.24) 读不了其元数据，
+    // 这正是 foundation.gestures.* 顶层符号部分缺失的根因。版本显式钉死，避免传递降级。
     implementation("androidx.compose.ui:ui:1.7.0")
     implementation("androidx.compose.ui:ui-graphics:1.7.0")
     implementation("androidx.compose.ui:ui-tooling-preview:1.7.0")
@@ -109,16 +108,16 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // kotlinx.serialization for JSON backup import/export
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+    // kotlinx.serialization for JSON backup import/export（1.7.3 起提供 Kotlin 2.0 编译 artifact）
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    // Coroutines（1.8.1 起提供 Kotlin 2.0 编译 artifact）
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     // Core utilities
     implementation("androidx.core:core-ktx:1.12.0")
 
     // FileProvider (for CSV/JSON export sharing) is part of androidx.core
 
-    debugImplementation("androidx.compose.ui:ui-tooling:1.6.7")
+    debugImplementation("androidx.compose.ui:ui-tooling:1.7.0")
 }
