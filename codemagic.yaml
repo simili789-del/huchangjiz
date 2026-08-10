@@ -1,7 +1,7 @@
 workflows:
   huochang-release:
     name: 货场作业记账 - 发布版
-    instance_type: linux
+    instance_type: mac_mini_m2
     max_build_duration: 30
     environment:
       java: 17
@@ -53,7 +53,7 @@ workflows:
 
   huochang-debug:
     name: 货场作业记账 - 调试版
-    instance_type: linux
+    instance_type: mac_mini_m2
     max_build_duration: 30
     environment:
       java: 17
