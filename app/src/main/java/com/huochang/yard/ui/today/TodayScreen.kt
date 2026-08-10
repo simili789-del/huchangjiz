@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.gestures.awaitPointerEventScope
 import androidx.compose.foundation.gestures.awaitPointerEvent
+import androidx.compose.foundation.gestures.tryAwaitRelease
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,7 +50,6 @@ import com.huochang.yard.util.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.math.max
-import kotlinx.coroutines.delay
 
 class TodayViewModel(application: Application) : BaseYardViewModel(application) {
 

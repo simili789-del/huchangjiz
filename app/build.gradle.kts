@@ -94,14 +94,21 @@ dependencies {
     //  real-world projects). The previous 2024.02.00 (Compose 1.6.0) is NOT a match for Compiler 1.5.14
     //  (1.6.0 pairs with Compiler 1.5.13) and left those gesture symbols unresolvable.
     implementation(platform("androidx.compose:compose-bom:2024.09.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
+    // Pin the core Compose artifacts to the EXACT BOM (2024.09.00 = 1.6.7) version. The BOM alone
+    // let a transitive dependency silently hold androidx.compose.foundation on an older 1.6.0-era
+    // build, which left the foundation.gestures.* symbols (pointerInput / detectTapGestures /
+    // awaitPointerEventScope / awaitPointerEvent / tryAwaitRelease) unresolvable under Compose
+    // Compiler 1.5.14. Pinning guarantees foundation 1.6.7, matching Compiler 1.5.14 + Kotlin 1.9.24.
+    implementation("androidx.compose.ui:ui:1.6.7")
+    implementation("androidx.compose.ui:ui-graphics:1.6.7")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.6.7")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     // Explicit foundation dependency: provides androidx.compose.foundation.gestures.*
-    // (pointerInput, detectTapGestures, awaitPointerEventScope, tryAwaitRelease, ...)
-    implementation("androidx.compose.foundation:foundation")
+    // (pointerInput, detectTapGestures, awaitPointerEventScope, tryAwaitRelease, ...).
+    // Pinned to 1.6.7 to match the BOM / Compiler 1.5.14 (a transitive dep had been
+    // silently downgrading this to the 1.6.0-era build, breaking gesture resolution).
+    implementation("androidx.compose.foundation:foundation:1.6.7")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
