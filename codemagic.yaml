@@ -17,6 +17,14 @@ workflows:
           echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
       - name: 授权 gradlew
         script: chmod +x gradlew
+      - name: 诊断依赖树（锁定 foundation 实际解析版本与冲突）
+        # 报错模式显示 androidx.compose.foundation.gestures 包能找到、但包内 pointerInput 等
+        # 顶层符号缺失 —— 说明实际编译入 classpath 的 foundation 版本手势包残缺。
+        # 打印 debugCompileClasspath 依赖树（聚焦 foundation/compose），暴露：
+        #   1) foundation 实际解析到哪个版本；2) 是否被某传递依赖拉偏/冲突覆盖。
+        script: |
+          echo "===== :app:dependencies debugCompileClasspath (foundation/compose) ====="
+          ./gradlew :app:dependencies --configuration debugCompileClasspath --no-daemon 2>&1 | grep -iE "foundation|compose" || true
       - name: 构建 debug APK
         # --refresh-dependencies 强制重新下载所有依赖（含 androidx.compose.foundation），
         # 绕过 Codemagic 默认 Gradle 缓存中可能损坏/不完整的 foundation AAR。

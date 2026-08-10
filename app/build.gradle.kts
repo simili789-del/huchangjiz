@@ -87,19 +87,18 @@ android {
 }
 
 dependencies {
-    // Every Compose artifact is pinned EXPLICITLY to the 1.6.7 library line — NO BOM — so a
-    // stray transitive version can never silently downgrade androidx.compose.foundation and
-    // break the foundation.gestures.* symbols (pointerInput / detectTapGestures /
-    // awaitPointerEventScope / awaitPointerEvent) that TodayScreen.kt relies on.
-    // 1.6.7 is the library line that pairs with Compose Compiler 1.5.14 + Kotlin 1.9.24.
-    implementation("androidx.compose.ui:ui:1.6.7")
-    implementation("androidx.compose.ui:ui-graphics:1.6.7")
-    implementation("androidx.compose.ui:ui-tooling-preview:1.6.7")
-    implementation("androidx.compose.material3:material3:1.2.1")
-    implementation("androidx.compose.material:material-icons-extended:1.6.7")
+    // 升级到 Compose 1.7.0 library line（仍配 Compose Compiler 1.5.14 + Kotlin 1.9.24，官方支持）。
+    // 此前的 1.6.7 线在构建环境实际解析到的 foundation 手势包残缺
+    // （gestures 包能找到但 pointerInput 等顶层符号缺失，background/clickable 在主包正常），
+    // 升级到 1.7.0 线以绕开可能损坏/不完整的 1.6.7 artifact；版本仍显式钉死，避免传递降级。
+    implementation("androidx.compose.ui:ui:1.7.0")
+    implementation("androidx.compose.ui:ui-graphics:1.7.0")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.7.0")
+    implementation("androidx.compose.material3:material3:1.3.0")
+    implementation("androidx.compose.material:material-icons-extended:1.7.0")
     // Explicit foundation dependency: provides androidx.compose.foundation.gestures.*
     // (pointerInput, detectTapGestures, awaitPointerEventScope, awaitPointerEvent, ...).
-    implementation("androidx.compose.foundation:foundation:1.6.7")
+    implementation("androidx.compose.foundation:foundation:1.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
