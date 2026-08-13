@@ -1,0 +1,71 @@
+name: yard_accounting
+description: 货场作业记账 - Flutter 原生 APK 应用
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # 状态管理
+  flutter_riverpod: ^2.5.0
+  freezed_annotation: ^2.4.0
+
+  # 本地数据库
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # 图表组件
+  fl_chart: ^0.68.0
+
+  # Excel 解析（导入微信分享的表格，对自定义 numFmt 更宽容）
+  spreadsheet_decoder: ^2.3.0
+  # ZIP 解压（用于 xlsx fallback 解析器，当 spreadsheet_decoder 不支持批注/复杂格式时）
+  archive: ^3.4.0
+  # 接收微信/系统分享的文件（1.8.x 兼容 Dart 3.5.4 / Flutter 3.24.5；1.9.0 起要求 Dart>=3.10）
+  receive_sharing_intent: ^1.8.1
+  # App 内手动选择本地文件导入
+  file_picker: ^8.0.0
+  # 真实导出：把生成的 CSV/JSON 文档交给系统分享/保存
+  path_provider: ^2.1.2
+  share_plus: ^7.2.0
+  # XFile 由 share_plus 7.x 的传递依赖 cross_file 提供，无需单独声明
+
+  # 工具库
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+  build_runner: ^2.4.0
+  hive_generator: ^2.0.1
+  freezed: ^2.5.0
+  json_serializable: ^6.7.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  # assets/images/ 当前无资源，暂不声明，避免 analyze 报 asset_directory_does_not_exist
+  # 如后续放入图片资源，恢复下面这行即可：
+  # assets:
+  #   - assets/images/
+  fonts: []
+
+# ===== 应用图标（换图机制，当前未启用自动生成）=====
+# 用法：把一张完整的方形图标（建议 1024x1024 PNG，主体居中留边）放到
+# assets/icon/app_icon.png，再运行 `flutter pub run flutter_launcher_icons`
+# 即可重新生成 Android/iOS 各分辨率图标（当前桌面图标已由
+# android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml 启用内置前景图过渡）。
+flutter_launcher_icons:
+  android: "launcher"
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#2E7D32"

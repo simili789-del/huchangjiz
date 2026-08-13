@@ -1,0 +1,27 @@
+# Flutter/Dart
+*.iml
+.dart_tool/
+.packages
+build/
+pubspec.lock
+*.g.dart
+*.freezed.dart
+
+# Android
+*.apk
+*.aab
+*.jks
+*.keystore
+local.properties
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# macOS
+.DS_Store

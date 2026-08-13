@@ -1,0 +1,51 @@
+workflows:
+  android-workflow:
+    name: Android Build & Sign
+    # CodeMagic 免费层仅提供 mac_mini_m2 机型，不写这一行会直接报
+    # "The selected instance type is not available with the current billing plan"
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: 3.24.5
+      java: 17
+      vars:
+        PACKAGE_NAME: "com.yard.accounting"
+    scripts:
+      - name: Set up local.properties
+        script: |
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Generate code (Hive/Freezed)
+        script: flutter pub run build_runner build --delete-conflicting-outputs
+      - name: Analyze code
+        script: flutter analyze
+      - name: Run tests
+        script: flutter test
+      - name: Build APK (arm64 single)
+        script: flutter build apk --release --target-platform android-arm64
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+      - build/**/outputs/**/mapping.txt
+    # 邮件通知为可选项：把 recipients 改成你的真实邮箱即可接收产物通知；
+    # 不想用可直接删除整个 publishing 段，不影响出包。
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+# ─────────────────────────────────────────────────────────────
+# 关于「正式签名 APK / AAB」（上架应用商店用）：
+# 当前 android/app/build.gradle 的 release 签名优先读环境变量
+# KEYSTORE_PATH / KEY_ALIAS / KEY_PASSWORD / KEYSTORE_PASSWORD，
+# 读不到时自动回退到 debug 签名 —— 所以现在构建出的是「可安装到手机测试的
+# debug 签名 release 包」，不是商店正式签名包。
+# 若要出正式签名包：
+#   1) 在 CodeMagic → Team settings → Code signing identities 上传你的 .keystore，
+#      起个引用名（如 huochang_keystore）；
+#   2) 在本文件 environment 下加：
+#        android_signing:
+#          - huochang_keystore
+#        groups:
+#          - keystore_credentials
+#   构建时 CodeMagic 会自动注入上面的 4 个环境变量，gradle 即走正式签名。
+# ─────────────────────────────────────────────────────────────
