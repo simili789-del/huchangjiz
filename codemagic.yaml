@@ -18,12 +18,9 @@ workflows:
         script: flutter pub get
       - name: Generate code (Hive/Freezed)
         script: flutter pub run build_runner build --delete-conflicting-outputs
-      # 注：Analyze / Run tests 已临时移除，优先保证出包。
-      # 如需质量门禁，取消下面两行注释即可：
-      # - name: Analyze code
-      #   script: flutter analyze
-      # - name: Run tests
-      #   script: flutter test
+      # Analyze 已启用：打包前一次性暴露全部代码错误，避免编译逐个报错反复推送。
+      - name: Analyze code
+        script: flutter analyze
       - name: Build APK (arm64 single)
         script: flutter build apk --release --target-platform android-arm64
     artifacts:

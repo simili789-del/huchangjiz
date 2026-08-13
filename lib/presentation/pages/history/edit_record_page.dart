@@ -6,6 +6,7 @@ import '../../../domain/entities/work_record.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/stats_provider.dart';
+import '../../providers/selected_date_record_provider.dart';
 import '../../widgets/job_type_card.dart';
 
 /// 编辑历史记录页面：可修改姓名/车号/班次/作业数量/备注，保存回 Hive。
