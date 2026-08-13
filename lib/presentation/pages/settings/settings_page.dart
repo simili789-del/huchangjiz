@@ -13,6 +13,7 @@ import '../../providers/app_settings_provider.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/selected_date_record_provider.dart';
+import '../../providers/stats_provider.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/yard_app_bar.dart';
 
@@ -136,8 +137,8 @@ class _JobTypePriceSectionState extends ConsumerState<_JobTypePriceSection> {
             child: Column(
               children: [
                 if (entries.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text('暂无作业类型，可在下方添加',
                         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ),
