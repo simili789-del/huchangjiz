@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../domain/entities/work_record.dart';
 
 /// 明细页记录卡片：头像/班次标签 + 信息摘要 + 编辑删除 + 金额。
+/// 玻璃拟态风格：磨砂玻璃底 + 柔光头像。
 class RecordListCard extends StatelessWidget {
   final WorkRecord record;
   final bool isSelected;
@@ -49,7 +50,7 @@ class RecordListCard extends StatelessWidget {
                 backgroundColor: shiftColor,
                 child: Text(
                   record.workerName.isNotEmpty ? record.workerName[0] : '?',
-                  style: TextStyle(color: shiftTextColor),
+                  style: TextStyle(color: shiftTextColor, fontWeight: FontWeight.w700),
                 ),
               ),
             const SizedBox(width: 12),
@@ -72,7 +73,7 @@ class RecordListCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: shiftColor,
+                          color: shiftColor.withOpacity(0.85),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(

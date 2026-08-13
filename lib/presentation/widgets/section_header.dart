@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// 分组小标题，如“快速记账”“今日摘要”。
+/// 分组小标题，如"快速记账""今日摘要"。
+/// 玻璃拟态风格：渐变竖条替代纯色竖条，呼应整体渐变光晕语言。
 class SectionHeader extends StatelessWidget {
   final String title;
   final Widget? trailing;
@@ -18,11 +19,15 @@ class SectionHeader extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 3,
-                height: 16,
+                width: 4,
+                height: 18,
                 decoration: BoxDecoration(
-                  color: cs.primary,
-                  borderRadius: BorderRadius.circular(1.5),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [cs.primary, cs.primary.withOpacity(0.3)],
+                  ),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(width: 8),

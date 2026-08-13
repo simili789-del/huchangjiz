@@ -38,7 +38,6 @@ class HistoryPage extends ConsumerWidget {
                 ref.invalidate(monthlyStatsProvider);
                 ref.invalidate(lastRecordProvider);
                 ref.invalidate(dayRecordsProvider);
-                ref.invalidate(selectedDateRecordProvider);
                 ref.read(selectedRecordIdsProvider.notifier).state = {};
               },
             ),
@@ -71,11 +70,6 @@ class HistoryPage extends ConsumerWidget {
                                 ),
                               );
                               ref.invalidate(historyRecordsProvider);
-                              ref.invalidate(last7DaysSummaryProvider);
-                              ref.invalidate(monthlyStatsProvider);
-                              ref.invalidate(lastRecordProvider);
-                              ref.invalidate(dayRecordsProvider);
-                              ref.invalidate(selectedDateRecordProvider);
                             },
                             onDelete: () async {
                               await ref
@@ -87,7 +81,6 @@ class HistoryPage extends ConsumerWidget {
                               ref.invalidate(monthlyStatsProvider);
                               ref.invalidate(lastRecordProvider);
                               ref.invalidate(dayRecordsProvider);
-                ref.invalidate(selectedDateRecordProvider);
                             },
                           ))
                       .toList(),
@@ -430,7 +423,7 @@ class _EmptyPlaceholder extends StatelessWidget {
         child: Text(
           '暂无符合条件的记录',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: Colors.grey.shade500,
               ),
         ),
       ),

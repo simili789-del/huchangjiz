@@ -36,8 +36,8 @@ Future<void> main() async {
     });
     final tempDir = await Directory.systemTemp.createTemp('hive_test_');
     Hive.init(tempDir.path);
-    if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(WorkRecordAdapter());
-    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ShiftTypeAdapter());
+    if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(ShiftTypeAdapter());
+    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(WorkRecordAdapter());
     if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(SalarySettingsAdapter());
     if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(AppSettingsAdapter());
     await Future.wait([

@@ -137,10 +137,10 @@ class _JobTypePriceSectionState extends ConsumerState<_JobTypePriceSection> {
             child: Column(
               children: [
                 if (entries.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
                     child: Text('暂无作业类型，可在下方添加',
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                        style: TextStyle(color: Colors.grey)),
                   ),
                 for (final e in entries)
                   Padding(
@@ -627,7 +627,6 @@ class _BackupSectionState extends ConsumerState<_BackupSection> {
                     ref.invalidate(last7DaysSummaryProvider);
                     ref.invalidate(monthlyStatsProvider);
                     ref.invalidate(dayRecordsProvider);
-                    ref.invalidate(selectedDateRecordProvider);
                     if (mounted) _snack('已恢复 ${records.length} 条记录');
                   }),
                 ),
@@ -646,7 +645,6 @@ class _BackupSectionState extends ConsumerState<_BackupSection> {
                     ref.invalidate(last7DaysSummaryProvider);
                     ref.invalidate(monthlyStatsProvider);
                     ref.invalidate(dayRecordsProvider);
-                    ref.invalidate(selectedDateRecordProvider);
                     if (mounted) _snack('已写入示例数据');
                   }),
                 ),

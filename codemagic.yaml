@@ -34,7 +34,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - your-email@example.com
+          - team@yard-accounting.com
 # ─────────────────────────────────────────────────────────────
 # 关于「正式签名 APK / AAB」（上架应用商店用）：
 # 当前 android/app/build.gradle 的 release 签名优先读环境变量

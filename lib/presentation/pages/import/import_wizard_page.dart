@@ -152,7 +152,7 @@ class _SheetSelector extends StatelessWidget {
                       : Theme.of(context)
                           .textTheme
                           .bodySmall
-                          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ?.copyWith(color: Colors.grey),
                 ),
               );
             })

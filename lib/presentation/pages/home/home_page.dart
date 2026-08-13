@@ -366,7 +366,7 @@ class _LastWorkDetail extends ConsumerWidget {
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
-                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ?.copyWith(color: Colors.grey.shade500),
               ),
             ),
           );
@@ -478,7 +478,7 @@ class _LastWorkDetail extends ConsumerWidget {
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
-                        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        ?.copyWith(color: Colors.grey.shade600),
                   ),
                 ],
               ],

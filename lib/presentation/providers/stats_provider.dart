@@ -76,8 +76,7 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
   final workerFilter = ref.watch(statsWorkerFilterProvider);
 
   final start = DateTime(month.year, month.month, 1);
-  final lastDay = DateTime(month.year, month.month + 1, 0);
-  final end = DateTime(lastDay.year, lastDay.month, lastDay.day, 23, 59, 59, 999, 999);
+  final end = DateTime(month.year, month.month + 1, 0);
   var records = repository.query(start: start, end: end);
 
   if (workerFilter.isNotEmpty) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/job_types.dart';
 
 /// 作业类型计数卡片：彩色圆点 + 名称/单价 + 大数字 + - / + / +5。
+/// 玻璃拟态风格：色点带柔光光晕，操作按钮为半透明玻璃胶囊。
 class JobTypeCard extends StatelessWidget {
   final String jobType;
   final int quantity;
@@ -28,11 +29,18 @@ class JobTypeCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 10,
-              height: 10,
+              width: 12,
+              height: 12,
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.65),
+                    blurRadius: 10,
+                    spreadRadius: 1.5,
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 12),
@@ -80,8 +88,9 @@ class JobTypeCard extends StatelessWidget {
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   padding: EdgeInsets.zero,
+                  backgroundColor: cs.primary.withOpacity(0.10),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   side: BorderSide(color: cs.primary.withOpacity(0.5)),
                 ),
@@ -105,13 +114,13 @@ class _StepButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final btnColor = color ?? Theme.of(context).colorScheme.primary;
     return IconButton(
-      icon: Icon(icon, color: color),
+      icon: Icon(icon, color: onPressed == null ? btnColor.withOpacity(0.35) : btnColor),
       onPressed: onPressed,
       style: IconButton.styleFrom(
-        backgroundColor: (color ?? Theme.of(context).colorScheme.primary)
-            .withOpacity(0.1),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        backgroundColor: btnColor.withOpacity(0.12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

@@ -3,9 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/work_record.dart';
 import 'repository_providers.dart';
 
-DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
-DateTime _endOfDay(DateTime d) => DateTime(d.year, d.month, d.day, 23, 59, 59, 999, 999);
-
 enum QuickRange { today, last7Days, thisMonth, lastMonth, custom }
 
 enum HistorySort { dateDesc, dateAsc, amountDesc }
@@ -35,14 +32,13 @@ class HistoryFilter {
     DateTime? customEnd,
     HistorySort? sort,
     bool clearShift = false,
-    bool clearCustomDates = false,
   }) {
     return HistoryFilter(
       range: range ?? this.range,
       keyword: keyword ?? this.keyword,
       shift: clearShift ? null : (shift ?? this.shift),
-      customStart: clearCustomDates ? null : (customStart ?? this.customStart),
-      customEnd: clearCustomDates ? null : (customEnd ?? this.customEnd),
+      customStart: customStart ?? this.customStart,
+      customEnd: customEnd ?? this.customEnd,
       sort: sort ?? this.sort,
     );
   }
@@ -51,19 +47,17 @@ class HistoryFilter {
     final now = DateTime.now();
     switch (range) {
       case QuickRange.today:
-        return (_startOfDay(now), _endOfDay(now));
+        return (now, now);
       case QuickRange.last7Days:
-        return (_startOfDay(now.subtract(const Duration(days: 6))), _endOfDay(now));
+        return (now.subtract(const Duration(days: 6)), now);
       case QuickRange.thisMonth:
-        return (DateTime(now.year, now.month, 1), _endOfDay(now));
+        return (DateTime(now.year, now.month, 1), now);
       case QuickRange.lastMonth:
         final lastMonth = DateTime(now.year, now.month - 1, 1);
-        final lastDay = _endOfDay(DateTime(now.year, now.month, 0));
+        final lastDay = DateTime(now.year, now.month, 0);
         return (lastMonth, lastDay);
       case QuickRange.custom:
-        final start = customStart ?? _startOfDay(now);
-        final end = customEnd ?? start;
-        return (_startOfDay(start), _endOfDay(end));
+        return (customStart ?? now, customEnd ?? now);
     }
   }
 }
@@ -73,7 +67,6 @@ final historyFilterProvider =
 
 final historyRecordsProvider = Provider<List<WorkRecord>>((ref) {
   final repository = ref.watch(recordRepositoryProvider);
-  final unitPrices = ref.watch(unitPricesProvider);
   final filter = ref.watch(historyFilterProvider);
   final (start, end) = filter.resolveDates();
   var records = repository.query(
@@ -88,7 +81,7 @@ final historyRecordsProvider = Provider<List<WorkRecord>>((ref) {
     case HistorySort.dateAsc:
       records.sort((a, b) => a.date.compareTo(b.date));
     case HistorySort.amountDesc:
-      records.sort((a, b) => b.amount(unitPrices).compareTo(a.amount(unitPrices)));
+      records.sort((a, b) => b.amount({}).compareTo(a.amount({})));
   }
   return records;
 });
@@ -97,8 +90,8 @@ final historyRecordsProvider = Provider<List<WorkRecord>>((ref) {
 final last7DaysSummaryProvider = Provider<Map<DateTime, List<WorkRecord>>>((ref) {
   final repository = ref.watch(recordRepositoryProvider);
   final now = DateTime.now();
-  final start = _startOfDay(now.subtract(const Duration(days: 6)));
-  final records = repository.query(start: start, end: _endOfDay(now));
+  final start = now.subtract(const Duration(days: 6));
+  final records = repository.query(start: start, end: now);
   final map = <DateTime, List<WorkRecord>>{};
   for (final r in records) {
     final key = DateTime(r.date.year, r.date.month, r.date.day);

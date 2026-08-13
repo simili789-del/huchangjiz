@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/constants/job_types.dart';
+import 'core/theme/app_background.dart';
 import 'core/theme/app_theme.dart';
 import 'domain/entities/app_settings.dart';
 import 'domain/entities/salary_settings.dart';
@@ -94,6 +95,10 @@ class YardAccountingApp extends ConsumerWidget {
         'dark' => ThemeMode.dark,
         _ => ThemeMode.system,
       },
+      // 用统一的玻璃拟态光斑背景包裹整个应用（含弹窗/路由页面），
+      // 不改变导航结构，仅作视觉装饰层。
+      builder: (context, child) =>
+          AppBackground(child: child ?? const SizedBox.shrink()),
       home: const RootShell(),
     );
   }
