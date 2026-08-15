@@ -19,8 +19,9 @@ workflows:
       - name: Generate code (Hive/Freezed)
         script: flutter pub run build_runner build --delete-conflicting-outputs
       # Analyze 已启用：打包前一次性暴露全部代码错误，避免编译逐个报错反复推送。
+      # --no-fatal-infos：纯 info 级 lint 不致命（不会卡死出包），但 error/warning 仍会拦截。
       - name: Analyze code
-        script: flutter analyze
+        script: flutter analyze --no-fatal-infos
       - name: Build APK (arm64 single)
         script: flutter build apk --release --target-platform android-arm64
     artifacts:

@@ -19,7 +19,7 @@ class AppBackground extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backdrop =
         isDark ? AppTheme.glassDarkBackdrop : AppTheme.glassLightBackdrop;
-    final orbs = AppTheme.backdropOrbs;
+    const orbs = AppTheme.backdropOrbs;
 
     return Container(
       color: backdrop,
