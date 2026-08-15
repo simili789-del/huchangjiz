@@ -25,3 +25,7 @@ android/app/release/
 
 # macOS
 .DS_Store
+
+# 本地 flutter pub get 生成，不应入库
+.flutter-plugins
+.flutter-plugins-dependencies
