@@ -50,7 +50,7 @@ workflows:
       - name: Build APK (arm64 single)
         script: |
           set -e
-          GRADLE_VER=8.7
+          GRADLE_VER=8.11.1
           ZIP="gradle-${GRADLE_VER}-bin.zip"
           # 放到 $HOME 持久目录（配合 cache 跨构建保留）
           DEST="$HOME/.gradle_offline"
