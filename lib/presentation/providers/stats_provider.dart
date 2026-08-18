@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/work_record.dart';
+import 'history_provider.dart';
 import 'repository_providers.dart';
 
 class PriceGroup {
@@ -47,6 +48,11 @@ class MonthlyStats {
   final int totalDayQty;
   final int totalNightQty;
 
+  /// 按货场（场地）聚合的作业总量：货场标准名（含空串「未分类」）-> 车数。
+  final Map<String, int> quantityByYard;
+  /// 按货场 × 作业类型 聚合：货场 -> (作业类型 -> 车数)，供「看清哪个货场干啥活」。
+  final Map<String, Map<String, int>> qtyByYardJob;
+
   const MonthlyStats({
     required this.month,
     required this.quantityByJobType,
@@ -58,6 +64,8 @@ class MonthlyStats {
     required this.estimatedSalary,
     required this.totalDayQty,
     required this.totalNightQty,
+    required this.quantityByYard,
+    required this.qtyByYardJob,
   });
 }
 
@@ -69,15 +77,20 @@ final statsMonthProvider = StateProvider<DateTime>((ref) {
 final statsWorkerFilterProvider = StateProvider<String>((ref) => '');
 
 final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
-  final repository = ref.watch(recordRepositoryProvider);
+  final all = ref.watch(allRecordsProvider);
   final unitPrices = ref.watch(unitPricesProvider);
   final month = ref.watch(statsMonthProvider);
   final salary = ref.watch(salarySettingsProvider);
   final workerFilter = ref.watch(statsWorkerFilterProvider);
 
   final start = DateTime(month.year, month.month, 1);
-  final end = DateTime(month.year, month.month + 1, 0);
-  var records = repository.query(start: start, end: end);
+  // 终点取当月最后一天 23:59:59.999，避免带时刻记录（如 JSON 恢复）被月末边界漏掉
+  final end = DateTime(month.year, month.month + 1, 0, 23, 59, 59, 999, 999);
+  // M9：复用全量快照，避免重复全量遍历 Hive。
+  var records = all.where((r) {
+    if (r.date.isBefore(start) || r.date.isAfter(end)) return false;
+    return true;
+  }).toList();
 
   if (workerFilter.isNotEmpty) {
     records = records
@@ -90,6 +103,8 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
   final incomeByWorker = <String, double>{};
   final quantityByPrice = <double, PriceGroup>{};
   final workerTemp = <String, WorkerStat>{};
+  final quantityByYard = <String, int>{};
+  final qtyByYardJob = <String, Map<String, int>>{};
   double totalIncome = 0;
   int totalDayQty = 0;
   int totalNightQty = 0;
@@ -98,6 +113,12 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
     final amount = r.amount(unitPrices);
     final qty = r.jobQuantities.values.fold<int>(0, (a, b) => a + b);
     final dayKey = DateTime(r.date.year, r.date.month, r.date.day);
+    final yard = r.yard ?? '';
+    quantityByYard[yard] = (quantityByYard[yard] ?? 0) + qty;
+    final yj = qtyByYardJob.putIfAbsent(yard, () => <String, int>{});
+    r.jobQuantities.forEach((jt, q2) {
+      yj[jt] = (yj[jt] ?? 0) + q2;
+    });
 
     r.jobQuantities.forEach((jobType, q) {
       quantityByJobType[jobType] = (quantityByJobType[jobType] ?? 0) + q;
@@ -149,5 +170,7 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
     estimatedSalary: salary.totalSalary(totalIncome),
     totalDayQty: totalDayQty,
     totalNightQty: totalNightQty,
+    quantityByYard: quantityByYard,
+    qtyByYardJob: qtyByYardJob,
   );
 });

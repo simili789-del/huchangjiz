@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.7.2 <4.0.0'
 
 dependencies:
   flutter:
@@ -24,10 +24,14 @@ dependencies:
 
   # Excel 解析（导入微信分享的表格，对自定义 numFmt 更宽容）
   spreadsheet_decoder: ^2.3.0
+  # 读取旧版 Excel 97-2003 (.xls) 文件（纯 Dart，无需原生依赖）
+  excel2003: ^1.0.0
   # ZIP 解压（用于 xlsx fallback 解析器，当 spreadsheet_decoder 不支持批注/复杂格式时）
   archive: ^3.4.0
-  # 接收微信/系统分享的文件（1.8.x 兼容 Dart 3.5.4 / Flutter 3.24.5；1.9.0 起要求 Dart>=3.10）
-  receive_sharing_intent: ^1.8.1
+  # 接收微信/系统分享的文件。
+  # 固定 1.7.0：1.8.1 经 gradlePlugin.minimumCompileSdk 强制宿主 compileSdk>=37，而 CodeMagic
+  # 构建机 SDK 仓库最高仅有 android-36（无法安装 37）；1.7.0 无此强制，compileSdk 36 即可满足。
+  receive_sharing_intent: 1.7.0
   # App 内手动选择本地文件导入
   file_picker: ^8.0.0
   # 真实导出：把生成的 CSV/JSON 文档交给系统分享/保存
@@ -37,6 +41,8 @@ dependencies:
 
   # 工具库
   intl: ^0.19.0
+  google_mlkit_text_recognition: ^0.16.0
+  image_picker: ^1.2.1
 
 dev_dependencies:
   flutter_test:

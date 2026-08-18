@@ -6,7 +6,6 @@ import '../../../domain/entities/work_record.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/selected_date_record_provider.dart';
-import '../../providers/stats_provider.dart';
 import '../../widgets/record_list_card.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/yard_app_bar.dart';
@@ -32,12 +31,9 @@ class HistoryPage extends ConsumerWidget {
                 await ref
                     .read(recordRepositoryProvider)
                     .deleteRecords(selected.toList());
-                // 批量删除后同样刷新全部记录相关 Provider，否则列表不重绘
-                ref.invalidate(historyRecordsProvider);
-                ref.invalidate(last7DaysSummaryProvider);
-                ref.invalidate(monthlyStatsProvider);
-                ref.invalidate(lastRecordProvider);
-                ref.invalidate(dayRecordsProvider);
+                // 批量删除后刷新：失效全量快照根即可级联刷新所有派生 Provider（含首页今日记账）
+                ref.invalidate(allRecordsProvider);
+                ref.invalidate(selectedDateRecordProvider);
                 ref.read(selectedRecordIdsProvider.notifier).state = {};
               },
             ),
@@ -69,18 +65,19 @@ class HistoryPage extends ConsumerWidget {
                                   builder: (_) => EditRecordPage(record: r),
                                 ),
                               );
-                              ref.invalidate(historyRecordsProvider);
+                              // 编辑返回后刷新全部记录相关 Provider（含首页今日记账/统计）。
+                              // H2：失效全量快照根即可级联刷新所有派生 Provider。
+                              ref.invalidate(allRecordsProvider);
+                              ref.invalidate(selectedDateRecordProvider);
                             },
                             onDelete: () async {
                               await ref
                                   .read(recordRepositoryProvider)
                                   .deleteRecords([r.id]);
-                              // 删除后刷新所有记录相关 Provider，否则 UI 不重绘
-                              ref.invalidate(historyRecordsProvider);
-                              ref.invalidate(last7DaysSummaryProvider);
-                              ref.invalidate(monthlyStatsProvider);
-                              ref.invalidate(lastRecordProvider);
-                              ref.invalidate(dayRecordsProvider);
+                              // 删除后刷新所有记录相关 Provider（含首页今日记账）。
+                              // H2：失效全量快照根即可级联刷新所有派生 Provider。
+                              ref.invalidate(allRecordsProvider);
+                              ref.invalidate(selectedDateRecordProvider);
                             },
                           ))
                       .toList(),
@@ -202,10 +199,10 @@ class _FilterPanel extends ConsumerWidget {
             Wrap(
               spacing: 8,
               children: [
-                _QuickChip(label: '今天', active: filter.range == QuickRange.today, onTap: () => ref.read(historyFilterProvider.notifier).update((s) => s.copyWith(range: QuickRange.today))),
-                _QuickChip(label: '近7天', active: filter.range == QuickRange.last7Days, onTap: () => ref.read(historyFilterProvider.notifier).update((s) => s.copyWith(range: QuickRange.last7Days))),
-                _QuickChip(label: '本月', active: filter.range == QuickRange.thisMonth, onTap: () => ref.read(historyFilterProvider.notifier).update((s) => s.copyWith(range: QuickRange.thisMonth))),
-                _QuickChip(label: '上月', active: filter.range == QuickRange.lastMonth, onTap: () => ref.read(historyFilterProvider.notifier).update((s) => s.copyWith(range: QuickRange.lastMonth))),
+                _QuickChip(label: '今天', active: filter.range == QuickRange.today, onTap: () => _selectRange(ref, QuickRange.today)),
+                _QuickChip(label: '近7天', active: filter.range == QuickRange.last7Days, onTap: () => _selectRange(ref, QuickRange.last7Days)),
+                _QuickChip(label: '本月', active: filter.range == QuickRange.thisMonth, onTap: () => _selectRange(ref, QuickRange.thisMonth)),
+                _QuickChip(label: '上月', active: filter.range == QuickRange.lastMonth, onTap: () => _selectRange(ref, QuickRange.lastMonth)),
               ],
             ),
             const SizedBox(height: 12),
@@ -241,6 +238,7 @@ class _FilterPanel extends ConsumerWidget {
                       prefixIcon: Icon(Icons.search, size: 20),
                       hintText: '搜索姓名/车号',
                       contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      filled: true,
                     ),
                     onChanged: (v) => ref
                         .read(historyFilterProvider.notifier)
@@ -255,6 +253,10 @@ class _FilterPanel extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _selectRange(WidgetRef ref, QuickRange range) {
+    ref.read(historyFilterProvider.notifier).update((s) => s.copyWith(range: range));
   }
 
   Future<void> _pickDate(BuildContext context, WidgetRef ref,
@@ -423,7 +425,7 @@ class _EmptyPlaceholder extends StatelessWidget {
         child: Text(
           '暂无符合条件的记录',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade500,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
         ),
       ),

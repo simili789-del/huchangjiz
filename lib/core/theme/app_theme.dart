@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 
-/// 玻璃拟态（Glassmorphism）主题：基于 Material 3 的主题配置，
-/// 支持 7 套主题色预设 + 深色模式，视觉语言为半透明玻璃卡片 + 柔光渐变背景。
+/// 基于 Material 3 的主题配置，支持 7 套主题色预设 + 深色模式。
 ///
-/// 通过 `AppTheme.light(index)` / `AppTheme.dark(index)` 按索引取色，
-/// 索引对应 `AppSettings.primaryColorIndex`（设置页取色器也消费 `primaries`）。
-/// 仅扩展 [ThemeData]，不改动任何业务逻辑。
+/// iOS 18 现代审美：
+/// - 背景色优先使用 #F2F2F7（浅色）
+/// - 强调色使用柔和的深灰色 #1C1C1E
+/// - 高频次圆角 radius 16–24
+/// - 所有颜色通过 ThemeData / ColorScheme 暴露，页面禁止硬编码颜色
 class AppTheme {
   AppTheme._();
+
+  /// iOS 系统浅色背景
+  static const Color iosSystemBackground = Color(0xFFF2F2F7);
+
+  /// iOS 强调深灰（接近 label 色）
+  static const Color iosLabel = Color(0xFF1C1C1E);
 
   /// 7 套主题色预设，与设置页「主题色」取色器一一对应。
   /// 索引 0 为默认货场绿。
@@ -21,17 +28,6 @@ class AppTheme {
     Colors.purple, // 6: 紫色
   ];
 
-  /// 玻璃拟态背景基色：深邃靛蓝（深色模式）/ 柔雾薰衣草（浅色模式）。
-  static const Color glassDarkBackdrop = Color(0xFF0E1030);
-  static const Color glassLightBackdrop = Color(0xFFEFF1FB);
-
-  /// 背景装饰光斑配色：翡翠绿 + 活力橙 + 靛蓝，呼应「财务增长」主题。
-  static const List<Color> backdropOrbs = [
-    Color(0xFF10B981), // 翡翠绿
-    Color(0xFFFF9142), // 活力橙
-    Color(0xFF4F5BD5), // 靛蓝
-  ];
-
   static ThemeData light(int primaryIndex) =>
       _createTheme(_seed(primaryIndex), Brightness.light);
 
@@ -39,131 +35,115 @@ class AppTheme {
       _createTheme(_seed(primaryIndex), Brightness.dark);
 
   /// 按索引取色（越界时取模循环，避免越界崩溃）。
-  static Color _seed(int index) => primaries[index % primaries.length];
+  static Color _seed(int index) =>
+      primaries[((index % primaries.length) + primaries.length) %
+          primaries.length];
 
   static ThemeData _createTheme(Color seedColor, Brightness brightness) {
-    final isDark = brightness == Brightness.dark;
+    final isLight = brightness == Brightness.light;
+
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: brightness,
+      // 强制浅色背景贴近 iOS #F2F2F7
+      surface: isLight ? iosSystemBackground : null,
+      // 强调文字/图标使用柔和深灰
+      onSurface: isLight ? iosLabel : null,
+    ).copyWith(
+      // 卡片等容器使用略亮/略暗的 surface
+      surfaceContainer: isLight
+          ? Colors.white
+          : const Color(0xFF2C2C2E),
+      surfaceContainerHighest: isLight
+          ? const Color(0xFFE5E5EA)
+          : const Color(0xFF3A3A3C),
     );
-
-    // 玻璃卡片：低不透明度白色叠加 + 细白描边，营造磨砂玻璃质感。
-    final glassFill = isDark
-        ? Colors.white.withOpacity(0.08)
-        : Colors.white.withOpacity(0.55);
-    final glassBorder = isDark
-        ? Colors.white.withOpacity(0.16)
-        : Colors.white.withOpacity(0.65);
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colorScheme,
-      // Scaffold 背景交由 AppBackground 装饰层绘制，此处保持透明以透出光斑渐变。
-      scaffoldBackgroundColor: Colors.transparent,
-      splashFactory: InkSparkle.splashFactory,
-      // 玻璃拟态卡片：半透明底 + 细描边 + 柔和投影，营造悬浮玻璃质感。
-      cardTheme: CardTheme(
-        elevation: isDark ? 0 : 6,
-        shadowColor: isDark ? Colors.transparent : seedColor.withOpacity(0.18),
+      scaffoldBackgroundColor:
+          isLight ? iosSystemBackground : colorScheme.surface,
+      // iOS 18 风格：大圆角、无投影、贴底容器色卡片。
+      cardTheme: CardThemeData(
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(26),
-          side: BorderSide(color: glassBorder, width: 1.2),
+          borderRadius: BorderRadius.circular(20),
         ),
-        color: glassFill,
+        color: colorScheme.surfaceContainer,
         margin: EdgeInsets.zero,
       ),
       appBarTheme: AppBarTheme(
         elevation: 0,
-        scrolledUnderElevation: 0,
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0.5,
+        backgroundColor: isLight ? iosSystemBackground : colorScheme.surface,
+        foregroundColor: isLight ? iosLabel : colorScheme.onSurface,
         centerTitle: false,
-        foregroundColor: colorScheme.onSurface,
+        titleTextStyle: TextStyle(
+          color: isLight ? iosLabel : colorScheme.onSurface,
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.transparent,
-        indicatorColor: colorScheme.primary.withOpacity(isDark ? 0.35 : 0.22),
+        indicatorColor: colorScheme.primaryContainer,
         elevation: 0,
-        height: 64,
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final selected = states.contains(WidgetState.selected);
-          return TextStyle(
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-          );
-        }),
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          final selected = states.contains(WidgetState.selected);
-          return IconThemeData(
-            color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-          );
-        }),
+        backgroundColor: isLight ? Colors.white.withValues(alpha: 0.9) : null,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: glassFill,
+        fillColor: colorScheme.surfaceContainerHighest,
+        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: glassBorder, width: 1.2),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: glassBorder, width: 1.2),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.8),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
         ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+      textTheme: ThemeData(brightness: brightness).textTheme.copyWith(
+            titleLarge: TextStyle(
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+              color: isLight ? iosLabel : null,
+            ),
+            titleMedium: TextStyle(
+              fontWeight: FontWeight.w600,
+              height: 1.3,
+              color: isLight ? iosLabel : null,
+            ),
+            headlineSmall: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              color: isLight ? iosLabel : null,
+            ),
+            bodyLarge: TextStyle(
+              color: isLight ? iosLabel : colorScheme.onSurface,
+            ),
+            bodyMedium: TextStyle(
+              color: isLight ? iosLabel : colorScheme.onSurface,
+            ),
+            bodySmall: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: glassBorder, width: 1.2),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-      ),
-      dialogTheme: DialogTheme(
-        backgroundColor: isDark
-            ? const Color(0xFF181B3C)
-            : Colors.white.withOpacity(0.96),
+      // 列表与 Cupertino 风格兼容
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        minVerticalPadding: 12,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-        ),
-      ),
-      bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: isDark
-            ? const Color(0xFF181B3C)
-            : Colors.white.withOpacity(0.98),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-      ),
-      textTheme: ThemeData().textTheme.copyWith(
-        titleLarge: const TextStyle(fontWeight: FontWeight.w700, height: 1.3),
-        titleMedium: const TextStyle(fontWeight: FontWeight.w600, height: 1.3),
-        headlineSmall: const TextStyle(
-          fontWeight: FontWeight.w800,
-          fontFeatures: [FontFeature.tabularFigures()], // 数字等宽对齐
-        ),
-        bodySmall: TextStyle(
-          color: colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w500,
+          borderRadius: BorderRadius.circular(16),
         ),
       ),
     );

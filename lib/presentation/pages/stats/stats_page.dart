@@ -81,6 +81,8 @@ class StatsPage extends ConsumerWidget {
           _JobTypeDistribution(stats: stats),
           const SectionHeader('按人员统计'),
           _WorkerStats(stats: stats),
+          const SectionHeader('按货场统计'),
+          _YardStats(stats: stats),
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -323,7 +325,12 @@ class _DailyBarChart extends StatelessWidget {
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(
                                 '${days[i].day}',
-                                style: const TextStyle(fontSize: 10),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
                               ),
                             );
                           },
@@ -487,6 +494,81 @@ class _WorkerStats extends StatelessWidget {
   }
 }
 
+class _YardStats extends ConsumerWidget {
+  final MonthlyStats stats;
+  const _YardStats({required this.stats});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unitPrices = ref.watch(unitPricesProvider);
+    final yards = stats.quantityByYard.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    if (yards.isEmpty) {
+      return const _EmptyCard(text: '本月暂无数据');
+    }
+    return Column(
+      children: yards.map((e) {
+        final yardName = e.key.isEmpty ? '未分类' : e.key;
+        final yj = stats.qtyByYardJob[e.key] ?? {};
+        final amount = yj.entries.fold<double>(
+          0,
+          (s, jt) => s + (unitPrices[jt.key] ?? 0) * jt.value,
+        );
+        final jobText = yj.entries
+            .where((jt) => jt.value > 0)
+            .map((jt) => '${jt.key} ${jt.value}车')
+            .join(' · ');
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        yardName,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${e.value}车 · ¥${amount.toStringAsFixed(2)}',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                if (jobText.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    jobText,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
 class _EmptyCard extends StatelessWidget {
   final String text;
 
@@ -501,7 +583,7 @@ class _EmptyCard extends StatelessWidget {
         child: Text(
           text,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade500,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
         ),
       ),

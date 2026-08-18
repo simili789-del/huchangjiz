@@ -59,6 +59,14 @@ class SettingsRepository {
     await _priceBox.delete(jobType);
   }
 
+  /// 整体替换作业类型单价（恢复备份时调用）：清空后写入，保证与备份一致。
+  Future<void> replaceAllPrices(Map<String, double> prices) async {
+    await _priceBox.clear();
+    for (final entry in prices.entries) {
+      await _priceBox.put(entry.key, entry.value);
+    }
+  }
+
   SalarySettings getSalarySettings() {
     return _salaryBox.get('current') ?? SalarySettings();
   }

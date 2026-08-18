@@ -5,6 +5,14 @@ analyzer:
     # Radio.groupValue/onChanged 在新版 Flutter 被标记弃用，但 API 仍可用，
     # 且当前代码功能正常；暂忽略以避免 analyze 因 info 级警告非零退出中断构建。
     deprecated_member_use: ignore
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
   language:
     strict-casts: false
     strict-raw-types: false

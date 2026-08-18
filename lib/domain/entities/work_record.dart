@@ -45,6 +45,12 @@ class WorkRecord extends HiveObject {
   @HiveField(7)
   final String? boatName;
 
+  /// 货场（场地）。装载机/挖掘机绩效里按「区域标题 / 表标题 / 场地列 / 备注」识别，
+  /// 同一司机同天可跨多个货场（各自独立记录，互不覆盖）。
+  /// 老数据或首页手填无货场时为 null，统计时统一按「未分类」处理。
+  @HiveField(8)
+  final String? yard;
+
   WorkRecord({
     required this.id,
     required this.date,
@@ -54,6 +60,7 @@ class WorkRecord extends HiveObject {
     required this.jobQuantities,
     this.remark,
     this.boatName,
+    this.yard,
   });
 
   WorkRecord copyWith({
@@ -65,6 +72,7 @@ class WorkRecord extends HiveObject {
     Map<String, int>? jobQuantities,
     String? remark,
     String? boatName,
+    String? yard,
   }) {
     return WorkRecord(
       id: id ?? this.id,
@@ -75,6 +83,7 @@ class WorkRecord extends HiveObject {
       jobQuantities: jobQuantities ?? this.jobQuantities,
       remark: remark ?? this.remark,
       boatName: boatName ?? this.boatName,
+      yard: yard ?? this.yard,
     );
   }
 

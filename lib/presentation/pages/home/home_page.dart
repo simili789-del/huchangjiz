@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/constants/job_types.dart';
 import '../../../domain/entities/work_record.dart';
+import '../../providers/app_settings_provider.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/selected_date_record_provider.dart';
@@ -13,6 +14,7 @@ import '../../widgets/section_header.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/yard_app_bar.dart';
 import '../../pages/import/import_wizard_page.dart';
+import '../../pages/reconciliation/reconciliation_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -39,6 +41,16 @@ class HomePage extends ConsumerWidget {
               }
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.camera_alt_outlined),
+            tooltip: '月报对账',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const ReconciliationPage()),
+              );
+            },
+          ),
         ],
       ),
       body: const _HomeBody(),
@@ -56,6 +68,18 @@ class _HomeBody extends ConsumerWidget {
     final jobTypes = unitPrices.keys.isNotEmpty
         ? unitPrices.keys.toList()
         : DefaultJobTypes.types;
+    // 常用作业类型常驻显示；非常用类型（火车装车/神华装车/神华归垛/挖掘机加高/封垛）
+    // 仅当已解锁（导入命中或用户手动勾选）时才显示，未解锁则彻底隐藏，保持首页清爽。
+    final settings = ref.watch(appSettingsProvider);
+    final hidden = settings.hiddenJobTypes.toSet();
+    final regularTypes = jobTypes
+        .where((t) => !DefaultJobTypes.advancedJobTypes.contains(t))
+        .where((t) => !hidden.contains(t))
+        .toList();
+    final revealed = settings.revealedAdvancedTypes.toSet();
+    final advancedTypes = DefaultJobTypes.advancedJobTypes
+        .where((t) => revealed.contains(t))
+        .toList();
     final selectedDate = ref.watch(selectedDateProvider);
 
     return recordAsync.when(
@@ -101,14 +125,45 @@ class _HomeBody extends ConsumerWidget {
                 .updateBasicInfo(shift: s),
           ),
           const SizedBox(height: 8),
-          ...jobTypes.map((jobType) => JobTypeCard(
+          ...regularTypes.map((jobType) => JobTypeCard(
                 jobType: jobType,
                 quantity: record.jobQuantities[jobType] ?? 0,
                 unitPrice: unitPrices[jobType] ?? 0,
-                onChanged: (delta) => ref
+                onChanged: (value) => ref
                     .read(selectedDateRecordProvider.notifier)
-                    .updateJobQuantity(jobType, delta),
+                    .updateJobQuantity(jobType, value),
               )),
+          if (advancedTypes.isNotEmpty)
+            Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                initiallyExpanded: false,
+                leading: const Icon(Icons.tune),
+                title: const Text('其他作业类型'),
+                subtitle: Text(
+                  '${advancedTypes.join('、')}（仅相关司机使用，点击展开）',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                childrenPadding: const EdgeInsets.only(bottom: 4),
+                children: advancedTypes
+                    .map((jobType) => JobTypeCard(
+                          jobType: jobType,
+                          quantity: record.jobQuantities[jobType] ?? 0,
+                          unitPrice: unitPrices[jobType] ?? 0,
+                          onChanged: (delta) => ref
+                              .read(selectedDateRecordProvider.notifier)
+                              .updateJobQuantity(jobType, delta),
+                        ))
+                    .toList(),
+              ),
+            ),
+          Center(
+            child: TextButton.icon(
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+              label: const Text('管理作业类型'),
+              onPressed: () => _showAdvancedTypeManager(context, ref),
+            ),
+          ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -132,6 +187,67 @@ class _HomeBody extends ConsumerWidget {
           const _LastWorkDetail(),
         ],
       ),
+    );
+  }
+
+  /// 弹出「管理作业类型」对话框：列出全部作业类型，勾选=在首页显示、取消=隐藏。
+  /// 固定高级类型（其他作业类型）用 revealedAdvancedTypes 控制，其余手写/导入类型用
+  /// hiddenJobTypes 控制，二者在 UI 上统一为「勾选即显示」。
+  void _showAdvancedTypeManager(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(appSettingsProvider.notifier);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            final settings = ref.read(appSettingsProvider);
+            final revealed = settings.revealedAdvancedTypes.toSet();
+            final hidden = settings.hiddenJobTypes.toSet();
+            final unitPrices = ref.read(unitPricesProvider);
+            // 全部类型：先固定高级类型，再其余（保持已有顺序）。
+            final allTypes = [
+              ...DefaultJobTypes.advancedJobTypes,
+              ...unitPrices.keys
+                  .where((t) => !DefaultJobTypes.advancedJobTypes.contains(t)),
+            ];
+            return AlertDialog(
+              title: const Text('管理作业类型'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: allTypes.map((type) {
+                    final isAdvanced =
+                        DefaultJobTypes.advancedJobTypes.contains(type);
+                    final checked = isAdvanced
+                        ? revealed.contains(type)
+                        : !hidden.contains(type);
+                    return CheckboxListTile(
+                      title: Text(type),
+                      subtitle:
+                          isAdvanced ? const Text('其他作业类型') : null,
+                      value: checked,
+                      onChanged: (v) {
+                        if (isAdvanced) {
+                          notifier.setAdvancedTypeVisible(type, v ?? false);
+                        } else {
+                          notifier.setJobTypeHidden(type, !(v ?? false));
+                        }
+                        setState(() {});
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('完成'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -257,6 +373,16 @@ class _SummaryCards extends ConsumerWidget {
         .where((r) => r.shift == ShiftType.night)
         .fold<int>(0, (s, r) => s + r.jobQuantities.values.fold(0, (a, b) => a + b));
 
+    // 昨日真实合计（同样聚合纯日期 + 导入记录）
+    final yesterday = DateTime(date.year, date.month, date.day - 1);
+    final yestRecords = ref.watch(dayRecordsProvider(yesterday));
+    final yestQty = yestRecords.fold<int>(
+      0,
+      (s, r) => s + r.jobQuantities.values.fold(0, (a, b) => a + b),
+    );
+    final yestAmount = yestRecords.fold<double>(
+        0, (s, r) => s + r.amount(unitPrices));
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
@@ -273,7 +399,8 @@ class _SummaryCards extends ConsumerWidget {
             child: StatCard(
               title: '今日收入',
               value: '¥${totalAmount.toStringAsFixed(2)}',
-              subtitle: '昨日合计 0车 · ¥0.00',
+              subtitle:
+                  '昨日 $yestQty车 · ¥${yestAmount.toStringAsFixed(2)}',
               valueColor: Colors.green,
             ),
           ),
@@ -363,10 +490,12 @@ class _LastWorkDetail extends ConsumerWidget {
               alignment: Alignment.center,
               child: Text(
                 '暂无历史记录',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: Colors.grey.shade500),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
               ),
             ),
           );
@@ -478,7 +607,10 @@ class _LastWorkDetail extends ConsumerWidget {
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
-                        ?.copyWith(color: Colors.grey.shade600),
+                        ?.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                   ),
                 ],
               ],

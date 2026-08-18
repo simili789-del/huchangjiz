@@ -1,51 +1,122 @@
 workflows:
   android-workflow:
     name: Android Build & Sign
-    # CodeMagic 免费层仅提供 mac_mini_m2 机型，不写这一行会直接报
-    # "The selected instance type is not available with the current billing plan"
-    instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
-      flutter: 3.24.5
+      # 3.47.0 对应 Dart 3.7+；excel2003 依赖要求 Dart >=3.7.2。
+      # 旧版 3.24.5 (Dart 3.5.4) 会因 SDK 约束导致 pub get 失败。
+      flutter: 3.47.0
       java: 17
       vars:
         PACKAGE_NAME: "com.yard.accounting"
+      # 正式签名配置（CodeMagic 专用位置：必须在 environment 下，不是 workflow 根级）
+      # 使用步骤：
+      # 1. Codemagic 后台 → Code signing identities → Android keystores → 生成或上传 keystore
+      # 2. 记住你填的 Reference name（如 yard_release_key）
+      # 3. keystore_reference 已改为 huochang 并启用
+      # 4. 一定要在本地备份 keystore 文件，丢失后此 App 将无法更新（除非换包名重发）
+      android_signing:
+        - huochang
+    # 持久缓存：第一次下载成功的 Gradle 压缩包会被缓存，后续构建直接复用，不再联网。
+    cache:
+      cache_paths:
+        - $HOME/.gradle_offline
     scripts:
       - name: Set up local.properties
         script: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+      - name: Map CodeMagic signing env vars
+        script: |
+          # Codemagic 默认注入 CM_KEYSTORE_PATH / CM_KEYSTORE_PASSWORD / CM_KEY_ALIAS / CM_KEY_PASSWORD
+          # 项目 build.gradle 使用 KEYSTORE_PATH / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD
+          # 若后台已配置 android_signing，则建立别名，让 Gradle 能读到；未配置时为空，不影响构建
+          if [ -n "${CM_KEYSTORE_PATH:-}" ]; then
+            echo "KEYSTORE_PATH=$CM_KEYSTORE_PATH" >> "$CM_ENV"
+            echo "KEYSTORE_PASSWORD=$CM_KEYSTORE_PASSWORD" >> "$CM_ENV"
+            echo "KEY_ALIAS=$CM_KEY_ALIAS" >> "$CM_ENV"
+            echo "KEY_PASSWORD=$CM_KEY_PASSWORD" >> "$CM_ENV"
+            echo "签名环境变量已映射"
+          else
+            echo "未配置 CodeMagic android_signing，使用 debug 签名构建"
+          fi
       - name: Get Flutter packages
         script: flutter pub get
       - name: Generate code (Hive/Freezed)
         script: flutter pub run build_runner build --delete-conflicting-outputs
-      # Analyze 已启用：打包前一次性暴露全部代码错误，避免编译逐个报错反复推送。
-      # --no-fatal-infos：纯 info 级 lint 不致命（不会卡死出包），但 error/warning 仍会拦截。
       - name: Analyze code
         script: flutter analyze --no-fatal-infos
+      - name: Run tests
+        script: flutter test
       - name: Build APK (arm64 single)
-        script: flutter build apk --release --target-platform android-arm64
+        script: |
+          set -e
+          GRADLE_VER=8.7
+          ZIP="gradle-${GRADLE_VER}-bin.zip"
+          # 放到 $HOME 持久目录（配合 cache 跨构建保留）
+          DEST="$HOME/.gradle_offline"
+          mkdir -p "$DEST"
+          LOCAL_ZIP="$DEST/$ZIP"
+
+          # 断点续传下载：弱网被截断可续上而非从头重下；下载后做 zip 结构校验。
+          download_gradle() {
+            local url="$1"
+            echo "尝试源: $url"
+            for i in 1 2 3 4 5 6; do
+              if curl -fL --connect-timeout 30 --max-time 900 --retry 5 --retry-delay 5 -C - \
+                   -o "$LOCAL_ZIP" "$url"; then
+                if python3 -c "import zipfile,sys; sys.exit(0 if zipfile.ZipFile('$LOCAL_ZIP').testzip() is None else 1)"; then
+                  echo "  ✓ 第${i}次: 下载完整且 zip 结构校验通过"; return 0
+                else
+                  echo "  ✗ 第${i}次: 文件损坏,删除后重试"; rm -f "$LOCAL_ZIP"
+                fi
+              else
+                echo "  ✗ 第${i}次: 下载失败($?),重试"
+              fi
+              sleep 3
+            done
+            return 1
+          }
+
+          # 若已缓存且校验通过则直接复用；否则先删损坏缓存再下载。
+          if [ -f "$LOCAL_ZIP" ] && python3 -c "import zipfile; zipfile.ZipFile('$LOCAL_ZIP').testzip()" 2>/dev/null; then
+            echo "== 复用已缓存且有效的 Gradle 压缩包 =="
+          else
+            [ -f "$LOCAL_ZIP" ] && rm -f "$LOCAL_ZIP"
+            echo "== 下载 Gradle ${GRADLE_VER} (官方源 + 断点续传 + 校验 + 重试) =="
+            download_gradle "https://services.gradle.org/distributions/${ZIP}" || {
+              echo "ERROR: 官方源未能取得有效的 Gradle 压缩包"; exit 1
+            }
+          fi
+          echo "Gradle 压缩包就绪: $LOCAL_ZIP ($(du -h "$LOCAL_ZIP" | cut -f1))"
+
+          # 将 distributionUrl 指向本地已校验包，彻底绕过构建时的网络下载。
+          # 注意：不再删除 ~/.gradle/wrapper/dists 缓存，避免误删构建机已有缓存。
+          # 用 python 改写，规避 BSD/GNU sed 的 -i 兼容性差异（CodeMagic 构建机为 macOS）。
+          LOCAL_ZIP="$LOCAL_ZIP" python3 -c "import re,os; p='android/gradle/wrapper/gradle-wrapper.properties'; u='file://'+os.environ['LOCAL_ZIP']; s=open(p,encoding='utf-8').read(); s=re.sub(r'^distributionUrl=.*\$','distributionUrl='+u,s,flags=re.M); open(p,'w',encoding='utf-8').write(s); print('updated distributionUrl ->',u)"
+          cat android/gradle/wrapper/gradle-wrapper.properties
+
+          echo "== 安装 Android SDK Platform 36 (满足 lifecycle/integration_test 等插件的 compileSdk 要求; 构建机仓库最高仅 36) =="
+          # --android-skip-build-dependency-validation 会跳过 Flutter 自动安装 compileSdk 平台的步骤，
+          # 而 platforms;android-36 是 lint 任务在配置阶段就需要的依赖，必须在编译前手动装好。
+          # 切勿尝试 android-37: CodeMagic 构建机 SDK 仓库不含 37 平台包。receive_sharing_intent 已降级到 1.7.0 去除其 37 强制。
+          ANDROID_HOME="${ANDROID_HOME:-/usr/local/share/android-sdk}"
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKM" ] || SDKM="$ANDROID_HOME/tools/bin/sdkmanager"
+          [ -x "$SDKM" ] || SDKM="$(command -v sdkmanager 2>/dev/null || true)"
+          echo "sdkmanager: ${SDKM:-<未找到>}"
+          if [ -n "$SDKM" ] && [ -x "$SDKM" ]; then
+            yes | "$SDKM" --licenses >/dev/null 2>&1 || true
+            yes | "$SDKM" "platforms;android-36"
+            echo "platforms;android-36 安装结果: $?"
+          else
+            echo "WARN: 未找到 sdkmanager,将依赖 Gradle 自动安装 platform 36"
+          fi
+          echo "== 构建 APK =="
+          flutter build apk --release --target-platform android-arm64 --android-skip-build-dependency-validation
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
       - build/**/outputs/**/mapping.txt
-    # 邮件通知为可选项：把 recipients 改成你的真实邮箱即可接收产物通知；
-    # 不想用可直接删除整个 publishing 段，不影响出包。
     publishing:
       email:
         recipients:
           - team@yard-accounting.com
-# ─────────────────────────────────────────────────────────────
-# 关于「正式签名 APK / AAB」（上架应用商店用）：
-# 当前 android/app/build.gradle 的 release 签名优先读环境变量
-# KEYSTORE_PATH / KEY_ALIAS / KEY_PASSWORD / KEYSTORE_PASSWORD，
-# 读不到时自动回退到 debug 签名 —— 所以现在构建出的是「可安装到手机测试的
-# debug 签名 release 包」，不是商店正式签名包。
-# 若要出正式签名包：
-#   1) 在 CodeMagic → Team settings → Code signing identities 上传你的 .keystore，
-#      起个引用名（如 huochang_keystore）；
-#   2) 在本文件 environment 下加：
-#        android_signing:
-#          - huochang_keystore
-#        groups:
-#          - keystore_credentials
-#   构建时 CodeMagic 会自动注入上面的 4 个环境变量，gradle 即走正式签名。
-# ─────────────────────────────────────────────────────────────

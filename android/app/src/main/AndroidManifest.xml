@@ -2,6 +2,10 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- 月报对账：拍照识别（image_picker 调用相机） -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- 月报对账：从相册选择图片（Android 13+ 需此权限） -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application
         android:label="货场作业记账"

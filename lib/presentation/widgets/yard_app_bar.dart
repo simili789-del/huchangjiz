@@ -10,7 +10,6 @@ import '../providers/selected_date_record_provider.dart';
 ///
 /// 直接返回真实 [AppBar]，由其统一处理状态栏安全区、背景与固定高度，
 /// 避免自定义控件当 appBar 使用时各页面高度/背景不一致导致的「错行」。
-/// 玻璃拟态风格：透明背景（透出全局光斑），Logo 方块改为渐变发光。
 class YardAppBar extends ConsumerWidget implements PreferredSizeWidget {
   /// 作为 Scaffold.appBar 使用时必须提供固定高度（与下方 toolbarHeight 保持一致）。
   @override
@@ -27,7 +26,6 @@ class YardAppBar extends ConsumerWidget implements PreferredSizeWidget {
     final now = DateTime.now();
     const weekDays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
     final weekDay = weekDays[now.weekday - 1];
-    final cs = Theme.of(context).colorScheme;
 
     return AppBar(
       // 根页面无需返回按钮
@@ -41,25 +39,14 @@ class YardAppBar extends ConsumerWidget implements PreferredSizeWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [cs.primary, cs.primary.withOpacity(0.6)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: cs.primary.withOpacity(0.45),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              color: Theme.of(context).colorScheme.primary,
+              borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
             child: Text(
               '记',
               style: TextStyle(
-                color: cs.onPrimary,
+                color: Theme.of(context).colorScheme.onPrimary,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -82,7 +69,7 @@ class YardAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 Text(
                   '${DateFormat('yyyy年M月d日').format(now)} $weekDay',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

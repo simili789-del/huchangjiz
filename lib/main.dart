@@ -1,12 +1,13 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/constants/job_types.dart';
-import 'core/theme/app_background.dart';
 import 'core/theme/app_theme.dart';
+import 'core/util/share_file.dart';
 import 'domain/entities/app_settings.dart';
 import 'domain/entities/salary_settings.dart';
 import 'domain/entities/work_record.dart';
@@ -19,6 +20,9 @@ const _defaultPrices = DefaultJobTypes.defaultPrices;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // M5：启动时清理历史分享临时文件残留，避免缓存目录无限累积。
+  await cleanupStaleShareFiles();
 
   // 捕获异步异常，避免初始化失败时白屏无任何提示
   runZonedGuarded(() async {
@@ -45,6 +49,7 @@ Future<void> main() async {
       Hive.openBox<SalarySettings>(HiveBoxes.salarySettings),
       Hive.openBox(HiveBoxes.appSettings),
       Hive.openBox<AppSettings>(HiveBoxes.appSettingsV2),
+      Hive.openBox('reconciliation_drafts'), // 对账识别草稿（非类型化，存 JSON）
     ]);
 
     // 首次启动：初始化默认作业类型单价（box 为空时写入）
@@ -55,19 +60,51 @@ Future<void> main() async {
       }
     }
 
+    // 作业类型名迁移：把历史遗留的旧名统一改为新标准名，
+    // 避免老数据里「内倒归剁」等旧名与新规范并存导致单价不一致。
+    // 迁移映射：旧名 → 新名（价格保留旧值；若新名已存在则取较高价）。
+    // 注：「外倒装车」自 2026-08 起成为标准类型名（原标准名为「货场倒货」），
+    // 故不再需要把「外倒装车」迁到「货场倒货」；历史「货场倒货」记录保留旧名分组。
+    const migrationMap = {
+      '内倒归剁': '内倒归垛',
+      '货场归垛': '货场归剁',
+      '归垛': '货场归剁',
+      '归剁': '货场归剁',
+    };
+    for (final entry in migrationMap.entries) {
+      final oldKey = entry.key;
+      final newKey = entry.value;
+      if (priceBox.containsKey(oldKey)) {
+        final oldPrice = (priceBox.get(oldKey) as num).toDouble();
+        final newPrice = priceBox.containsKey(newKey)
+            ? math.max(oldPrice, (priceBox.get(newKey) as num).toDouble())
+            : oldPrice;
+        await priceBox.put(newKey, newPrice);
+        await priceBox.delete(oldKey);
+      }
+    }
+    // 补全默认类型：确保新规范里的标准类型都有单价（缺则写默认值）
+    for (final entry in _defaultPrices.entries) {
+      if (!priceBox.containsKey(entry.key)) {
+        await priceBox.put(entry.key, entry.value);
+      }
+    }
+
     runApp(const ProviderScope(child: YardAccountingApp()));
   }, (error, stack) {
     // 初始化失败也启动 App，展示错误页而非白屏
     debugPrint('初始化失败: $error\n$stack');
-    runApp(MaterialApp(
+    runApp(const MaterialApp(
       home: Material(
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.all(32),
             child: Text(
-              '初始化失败：$error\n\n请重启 App，如持续失败请反馈此信息。',
+              // S3：生产环境不向用户暴露内部异常文本（可能含路径/类型信息），
+              // 详细异常仅通过 debugPrint 输出（见上方 onError）。
+              '初始化失败，请重启 App。若持续失败，请联系开发团队获取支持。',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red, fontSize: 14),
+              style: TextStyle(color: Colors.red, fontSize: 14),
             ),
           ),
         ),
@@ -95,10 +132,6 @@ class YardAccountingApp extends ConsumerWidget {
         'dark' => ThemeMode.dark,
         _ => ThemeMode.system,
       },
-      // 用统一的玻璃拟态光斑背景包裹整个应用（含弹窗/路由页面），
-      // 不改变导航结构，仅作视觉装饰层。
-      builder: (context, child) =>
-          AppBackground(child: child ?? const SizedBox.shrink()),
       home: const RootShell(),
     );
   }

@@ -1,44 +1,69 @@
 # 货场作业记账（Flutter 版）
 
-基于《货场作业记账 APK 软件开发方案》生成的 Flutter 原生工程骨架，实现方案中四大模块：
-今日记账、明细查询、月报统计、设置管理，采用 Riverpod + Hive 三层架构（表现层 / 业务层 / 数据层）。
+基于《货场作业记账 APK 软件开发方案》生成的 Flutter 原生工程，实现今日记账、明细查询、月报统计、设置管理、Excel 导入、对账识别等模块。
+
+采用 **Clean Architecture** 分层（core / data / domain / presentation）+ **Riverpod** 状态管理 + **Hive** 本地数据库。
+
+## 最新更新（iOS 18 现代审美）
+
+- **毛玻璃效果卡片**（`GlassmorphicCard`）：作为列表项与数据卡片的基类，使用 `BackdropFilter` + 半透明填充，圆角 16–24。
+- **主题色严格遵循 iOS 18**：浅色背景 `#F2F2F7`，强调深灰 `#1C1C1E`，全部颜色通过 `ThemeData` / `ColorScheme` 全局定义，页面零硬编码颜色。
+- **无障碍点击区域**：所有可交互控件最小高度 44px。
+- **大圆角 + 轻阴影**：卡片、输入框、列表统一 radius 16–24，符合 iOS 18 审美。
+
+## 架构与编码原则
+
+| 规则 | 说明 |
+|------|------|
+| 类型安全 | 严禁 `dynamic`，全部使用泛型与强类型 |
+| 异步处理 | 数据库 IO 全部非阻塞异步，不阻塞 UI |
+| 审美一致性 | 颜色仅通过 ThemeData 定义 |
+| 状态管理 | Riverpod `AsyncNotifier` 实现增删改查响应式更新 |
 
 ## 首次运行
 
-本工程使用手写的 Android 原生工程目录（`android/`），未包含 iOS/Web 平台目录。建议按以下步骤补全并运行：
-
 ```bash
-# 1. 安装依赖（需要本机已安装 Flutter SDK 3.22.x）
+# 1. 安装依赖（Flutter SDK >= 3.22）
 flutter pub get
 
-# 2. 生成 Hive TypeAdapter（work_record.g.dart / salary_settings.g.dart 等）
+# 2. 生成 Hive TypeAdapter
 flutter pub run build_runner build --delete-conflicting-outputs
 
-# 3. 如需 iOS 工程，可另行执行（本骨架未提供 ios/ 目录）：
-#    flutter create --platforms=ios .
-
-# 4. 连接设备或模拟器后运行
+# 3. 运行
 flutter run
 ```
-
-> 说明：本工程是在无网络、无 Flutter SDK 的环境中手工搭建的源码骨架，
-> 尚未执行过 `flutter pub get` / `build_runner` / 实机编译验证。
-> 请在本地或 CI（见 `.github/workflows/ci.yml`、`codemagic.yaml`）中完成依赖安装与代码生成后再构建。
 
 ## 目录结构
 
 ```
 lib/
-├── core/              # 常量、主题
-├── data/              # Repository 实现（Hive 存取）
-├── domain/            # Freezed/Hive 实体
-├── presentation/      # 页面、Provider、Widget
-└── main.dart          # 入口：初始化 Hive、注册 Adapter
+├── core/
+│   ├── constants/     # 作业类型、货场常量
+│   ├── theme/         # AppTheme（iOS 18 配色）
+│   ├── util/
+│   └── widgets/       # GlassmorphicCard 等通用组件
+├── data/
+│   ├── repositories/  # Hive 实现的 Repository
+│   └── serialization/
+├── domain/
+│   ├── entities/      # WorkRecord、AppSettings 等
+│   └── models/
+├── presentation/
+│   ├── pages/         # 首页、历史、统计、设置、导入、对账
+│   ├── providers/     # Riverpod Notifier / Provider
+│   ├── widgets/       # 业务卡片（已接入毛玻璃）
+│   └── root_shell.dart
+└── main.dart
 ```
+
+## 核心实体（WorkRecord）
+
+- 日期、工人、车号、班次（白班/夜班）
+- 作业类型 → 数量 Map（支持多类型同记录）
+- 船名、货场（可选）
+- `amount(unitPrices)` 自动计算总金额
 
 ## CI/CD
 
-- `.github/workflows/ci.yml`：push/PR 时自动 `pub get` → 代码生成 → `analyze` → `test` → debug 构建。
-- `codemagic.yaml`：Android 签名打包与 Google Play 内部测试轨道发布，密钥通过 CodeMagic
-  环境变量（`KEYSTORE_PATH`、`KEYSTORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`）注入，
-  不提交至 Git。
+- `.github/workflows/ci.yml`：analyze + test + debug 构建
+- `codemagic.yaml`：签名打包与内部测试轨道

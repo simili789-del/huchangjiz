@@ -31,6 +31,17 @@ class AppSettings extends HiveObject {
   @HiveField(7, defaultValue: <String>[])
   final List<String> boatNames;
 
+  /// 已解锁显示的非常用作业类型（其他作业类型）。默认空 → 首页不显示折叠区；
+  /// 导入含某非常用类型或用户在「管理作业类型」里手动勾选时加入，持久化。
+  @HiveField(8, defaultValue: <String>[])
+  final List<String> revealedAdvancedTypes;
+
+  /// 被隐藏的（普通/手动添加）作业类型。勾选取消即加入，首页常规区不再显示。
+  /// 与 revealedAdvancedTypes 区分：后者管「其他作业类型」5 个固定高级类型的显隐，
+  /// 本字段管其余可手动添加类型的显隐，二者互不干扰。
+  @HiveField(9, defaultValue: <String>[])
+  final List<String> hiddenJobTypes;
+
   AppSettings({
     this.defaultWorkerName = '',
     this.defaultVehicleNo = '',
@@ -40,6 +51,8 @@ class AppSettings extends HiveObject {
     this.primaryColorIndex = 0,
     this.hideAmount = false,
     this.boatNames = const [],
+    this.revealedAdvancedTypes = const [],
+    this.hiddenJobTypes = const [],
   });
 
   AppSettings copyWith({
@@ -51,6 +64,8 @@ class AppSettings extends HiveObject {
     int? primaryColorIndex,
     bool? hideAmount,
     List<String>? boatNames,
+    List<String>? revealedAdvancedTypes,
+    List<String>? hiddenJobTypes,
   }) {
     return AppSettings(
       defaultWorkerName: defaultWorkerName ?? this.defaultWorkerName,
@@ -61,6 +76,9 @@ class AppSettings extends HiveObject {
       primaryColorIndex: primaryColorIndex ?? this.primaryColorIndex,
       hideAmount: hideAmount ?? this.hideAmount,
       boatNames: boatNames ?? this.boatNames,
+      revealedAdvancedTypes:
+          revealedAdvancedTypes ?? this.revealedAdvancedTypes,
+      hiddenJobTypes: hiddenJobTypes ?? this.hiddenJobTypes,
     );
   }
 }
