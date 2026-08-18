@@ -4,12 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../domain/entities/reconciliation_result.dart';
 import '../../providers/reconciliation_providers.dart';
 
-/// M1 月报对账页：拍照/选图 → 离线 OCR → 可手动改数的识别预览 → 存草稿。
-///
-/// 注意：自动「解析 + 与 App 数据对账」是 M2 的事；本页只负责把图片
-/// 变成可编辑的文本行，并暂存为草稿，供 M2 读取。
+/// M2 月报对账页：拍照/选图 → 离线 OCR → 可手动改数的识别预览 → 自动解析对账。
 class ReconciliationPage extends ConsumerStatefulWidget {
   const ReconciliationPage({super.key});
 
@@ -169,18 +167,26 @@ class _Body extends ConsumerWidget {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            itemCount: state.lines.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, i) => _EditableLine(
-              initialText: state.lines[i].text,
-              onChanged: (v) =>
-                  ref.read(reconciliationStateProvider.notifier).updateLine(i, v),
+        // 对账结果（M2）
+        if (state.result != null) ...[
+          _ReconciliationSummaryCard(summary: state.result!.summary),
+          Expanded(
+            child: _ReconciliationResultList(items: state.result!.items),
+          ),
+        ] else
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              itemCount: state.lines.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, i) => _EditableLine(
+                initialText: state.lines[i].text,
+                onChanged: (v) => ref
+                    .read(reconciliationStateProvider.notifier)
+                    .updateLine(i, v),
+              ),
             ),
           ),
-        ),
         _ActionBar(state: state),
       ],
     );
@@ -251,7 +257,7 @@ class _ActionBar extends ConsumerWidget {
                             .saveDraft();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                            content: Text('已保存识别草稿，自动解析对账（M2）即将上线'),
+                            content: Text('已保存识别草稿'),
                           ));
                         }
                       },
@@ -260,17 +266,169 @@ class _ActionBar extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton.icon(
-                icon: const Icon(Icons.auto_awesome),
-                label: const Text('开始对账'),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('自动解析对账（M2）即将上线，请先保存草稿'),
-                  ));
-                },
+                icon: state.reconciling
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.auto_awesome),
+                label: Text(state.reconciling ? '对账中…' : '开始对账'),
+                onPressed: state.reconciling
+                    ? null
+                    : () async {
+                        await ref
+                            .read(reconciliationStateProvider.notifier)
+                            .reconcile();
+                      },
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 对账汇总卡片。
+class _ReconciliationSummaryCard extends StatelessWidget {
+  final ReconciliationSummary summary;
+  const _ReconciliationSummaryCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '对账汇总：共 ${summary.total} 条',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _SummaryChip(label: '一致', value: summary.matched, color: Colors.green),
+                _SummaryChip(label: '月报独有', value: summary.reportOnly, color: Colors.orange),
+                _SummaryChip(label: 'App 独有', value: summary.appOnly, color: Colors.blue),
+                _SummaryChip(label: '数量不符', value: summary.mismatch, color: Colors.red),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  const _SummaryChip({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [
+          Text('$value', style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 18)),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      );
+}
+
+/// 对账差异列表（默认只看差异，可切换全部）。
+class _ReconciliationResultList extends StatefulWidget {
+  final List<ReconciliationItem> items;
+  const _ReconciliationResultList({required this.items});
+
+  @override
+  State<_ReconciliationResultList> createState() => _ReconciliationResultListState();
+}
+
+class _ReconciliationResultListState extends State<_ReconciliationResultList> {
+  bool _showAll = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayItems = _showAll
+        ? widget.items
+        : widget.items.where((i) => i.type != DifferenceType.matched).toList();
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Row(
+            children: [
+              Text(
+                _showAll ? '全部结果' : '只看差异',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => setState(() => _showAll = !_showAll),
+                icon: Icon(_showAll ? Icons.filter_list_off : Icons.filter_list),
+                label: Text(_showAll ? '只看差异' : '显示全部'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: displayItems.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, i) {
+              final item = displayItems[i];
+              return ListTile(
+                dense: true,
+                leading: _DifferenceBadge(type: item.type),
+                title: Text('${item.workerName} · ${item.day}日${item.shift}班'),
+                subtitle: Text(
+                  '${item.jobType ?? '未知类型'} · ${item.price.toStringAsFixed(1)}元/车',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('月报 ${item.reportCount}', style: const TextStyle(fontSize: 13)),
+                    Text('App ${item.appCount}', style: const TextStyle(fontSize: 13)),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DifferenceBadge extends StatelessWidget {
+  final DifferenceType type;
+  const _DifferenceBadge({required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (type) {
+      DifferenceType.matched => Colors.green,
+      DifferenceType.reportOnly => Colors.orange,
+      DifferenceType.appOnly => Colors.blue,
+      DifferenceType.mismatch => Colors.red,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        type.label,
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }
