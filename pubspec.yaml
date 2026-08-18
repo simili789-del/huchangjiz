@@ -43,6 +43,8 @@ dependencies:
   intl: ^0.19.0
   google_mlkit_text_recognition: ^0.16.0
   image_picker: ^1.2.1
+  # OCR 前图像预处理（转正/放大/纠斜/提对比/清晰度检测），纯 Dart，无原生依赖。
+  image: ^4.2.0
 
 dev_dependencies:
   flutter_test:

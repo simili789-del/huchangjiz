@@ -36,3 +36,25 @@ class OcrLine {
               ),
       );
 }
+
+/// OCR 识别结果：增强后的图片路径 + 识别文本行 + 清晰度信息。
+class OcrRecognition {
+  /// 识别用的（已做 OCR 前增强的）图片路径，同时用于界面展示。
+  final String processedImagePath;
+
+  /// 识别出的文本行（已过数字纠错）。
+  final List<OcrLine> lines;
+
+  /// 清晰度评分 0~1，越大越清晰。
+  final double sharpness;
+
+  /// 是否疑似模糊（低于阈值，建议重拍）。
+  final bool blurry;
+
+  OcrRecognition({
+    required this.processedImagePath,
+    required this.lines,
+    required this.sharpness,
+    required this.blurry,
+  });
+}

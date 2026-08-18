@@ -160,6 +160,28 @@ class _Body extends ConsumerWidget {
               ),
             ),
           ),
+        if (state.blurry)
+          Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '照片有点模糊，识别可能不准，建议重拍一张更清晰的。',
+                    style: TextStyle(fontSize: 13, color: Colors.orange),
+                  ),
+                ),
+              ],
+            ),
+          ),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Text(

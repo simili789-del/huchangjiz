@@ -1,11 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/util/monthly_report_parser.dart';
+import '../../core/util/name_matcher.dart';
 import '../../data/repositories/ocr_repository.dart';
 import '../../data/repositories/reconciliation_draft_repository.dart';
 import '../../data/repositories/reconciliation_service.dart';
 import '../../data/repositories/record_repository.dart';
-import '../../core/util/monthly_report_parser.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../domain/entities/ocr_result.dart';
 import '../../domain/entities/reconciliation_result.dart';
@@ -44,6 +47,12 @@ class ReconciliationState {
   final String? errorMessage;
   final bool saved;
 
+  /// 清晰度评分 0~1（来自 OCR 前图像分析）。
+  final double sharpness;
+
+  /// 是否疑似模糊（低于阈值，建议重拍）。
+  final bool blurry;
+
   /// 是否正在执行对账解析。
   final bool reconciling;
 
@@ -57,6 +66,8 @@ class ReconciliationState {
     this.hasError = false,
     this.errorMessage,
     this.saved = false,
+    this.sharpness = 1.0,
+    this.blurry = false,
     this.reconciling = false,
     this.result,
   });
@@ -68,6 +79,8 @@ class ReconciliationState {
     bool? hasError,
     String? errorMessage,
     bool? saved,
+    double? sharpness,
+    bool? blurry,
     bool? reconciling,
     ReconciliationResult? result,
     bool clearImage = false,
@@ -80,6 +93,8 @@ class ReconciliationState {
       hasError: hasError ?? this.hasError,
       errorMessage: errorMessage ?? this.errorMessage,
       saved: saved ?? this.saved,
+      sharpness: sharpness ?? this.sharpness,
+      blurry: blurry ?? this.blurry,
       reconciling: reconciling ?? this.reconciling,
       result: clearResult ? null : (result ?? this.result),
     );
@@ -99,7 +114,7 @@ class ReconciliationNotifier extends StateNotifier<ReconciliationState> {
     this._settingsRepo,
   ) : super(const ReconciliationState());
 
-  /// 选图后调用：记录图片路径并跑 OCR。
+  /// 选图后调用：记录图片路径并跑 OCR（含图像增强 + 姓名词典校正）。
   Future<void> recognize(String imagePath) async {
     state = state.copyWith(
       imagePath: imagePath,
@@ -110,8 +125,36 @@ class ReconciliationNotifier extends StateNotifier<ReconciliationState> {
       clearResult: true,
     );
     try {
-      final lines = await _ocr.recognize(imagePath);
-      state = state.copyWith(lines: lines, processing: false);
+      final rec = await _ocr.recognize(imagePath);
+
+      // 预处理生成了新文件：删除原始临时图，避免缓存累积。
+      if (imagePath != rec.processedImagePath) {
+        try {
+          await File(imagePath).delete();
+        } catch (_) {
+          // 忽略删除失败
+        }
+      }
+
+      // 姓名词典校正：把 OCR 错字姓名纠回已知工人名，提升对账匹配率。
+      final known = NameMatcher.collectKnownNames(_recordRepo, _settingsRepo);
+      final correctedLines = rec.lines.map((l) {
+        if (MonthlyReportParser.looksLikeNameLine(l.text)) {
+          final fixed = NameMatcher.bestMatch(l.text, known);
+          if (fixed != null && fixed != l.text) {
+            return l.copyWith(text: fixed);
+          }
+        }
+        return l;
+      }).toList();
+
+      state = state.copyWith(
+        lines: correctedLines,
+        imagePath: rec.processedImagePath,
+        sharpness: rec.sharpness,
+        blurry: rec.blurry,
+        processing: false,
+      );
     } catch (e, st) {
       debugPrint('OCR 失败: $e\n$st');
       state = state.copyWith(
