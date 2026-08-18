@@ -117,7 +117,8 @@ class _Body extends ConsumerWidget {
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
-            '点击下方按钮，拍下或选择会计发的「月度作业量汇总表」，开始智能对账。',
+            '拍下或选择会计发的「月度作业量汇总表」，开始智能对账。\n\n'
+            '📸 拍摄小贴士：请正对表格、光线充足、画面清晰，可显著提升识别准确率。',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 15),
           ),
