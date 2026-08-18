@@ -62,3 +62,11 @@ android {
 flutter {
     source '../..'
 }
+
+// 中文 OCR 模型：google_mlkit_text_recognition 插件对 chinese/japanese/korean/devanagari
+// 仅以 compileOnly 声明（不打包进 APK）。本应用只用 TextRecognitionScript.chinese，需在此
+// 显式 implementation 中文 artifact，否则 release R8 报 Missing class，且运行时中文识别会
+// ClassNotFoundException 崩溃。其余未用语言靠 proguard-rules.pro 的 -dontwarn 抑制即可。
+dependencies {
+    implementation "com.google.mlkit:text-recognition-chinese:16.0.1"
+}
