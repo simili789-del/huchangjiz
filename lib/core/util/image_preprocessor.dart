@@ -109,8 +109,11 @@ class ImagePreprocessor {
       // 4. Unsharp Mask 锐化（对小数字特别有效）。
       img = _unsharpMask(img, amount: 1.4, radius: 1.0, threshold: 4);
 
-      // 5. 绿底补偿：压低高饱和绿色，提升数字对比。
-      img = _suppressGreenHighlight(img);
+      // 5. 绿底补偿：仅当图片确有大面积高饱和绿色（Excel 绿底高亮）才执行，
+      //    普通截图/纸张翻拍直接跳过，省掉一遍全图像素循环。
+      if (_hasGreenTint(img)) {
+        img = _suppressGreenHighlight(img);
+      }
 
       // 6. 清晰度评分。
       final sharpness = _estimateSharpness(img);
@@ -271,6 +274,24 @@ class ImagePreprocessor {
       }
     }
     return out;
+  }
+
+  /// 采样预判是否存在大面积的 Excel 绿底高亮（绿色通道显著高于红蓝）。
+  /// 每 24px 取一个样点，绿色占比 ≥5% 才认为需要绿底抑制。
+  static bool _hasGreenTint(Image src) {
+    final w = src.width, h = src.height;
+    var total = 0, green = 0;
+    for (int y = 0; y < h; y += 24) {
+      for (int x = 0; x < w; x += 24) {
+        final p = src.getPixel(x, y);
+        final r = p.r.toDouble();
+        final g = p.g.toDouble();
+        final b = p.b.toDouble();
+        total++;
+        if (g > r + 25 && g > b + 25 && g > 120) green++;
+      }
+    }
+    return total > 0 && green / total >= 0.05;
   }
 
   /// 压低高饱和绿色（Excel 绿底高亮），让数字对比度回升。

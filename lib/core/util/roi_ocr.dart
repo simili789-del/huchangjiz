@@ -1,41 +1,41 @@
 import 'dart:io';
 import 'dart:math';
-import 'dart:ui' show Rect;
 
-import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/entities/ocr_result.dart';
 import '../../data/repositories/ocr_engine.dart';
+import '../../core/util/monthly_report_parser.dart';
 
-/// ROI 二次识别：对姓名列、数字区分别裁剪放大后再 OCR，提升密集表格准确率。
+/// ROI 二次识别（仅增强姓名列）。
 ///
-/// 流程：
-/// 1. 用整图 OCR 结果粗定位姓名列右边界、表头行、合计列；
-/// 2. 按逻辑行裁剪「数字区」→ 放大 1.6~2.0 倍 → 再 OCR（只关心数字）；
-/// 3. 姓名列单独裁剪放大 → 再 OCR（只关心中文姓名）；
-/// 4. 把二次识别结果按坐标合并回原行列表。
+/// 设计目标：在不破坏月报结构的前提下，单独把最容易被误认的「中文姓名列」裁剪
+/// 放大后再识别一次，按纵坐标映射回原行、只替换姓名文本。
 ///
-/// **卡顿修复**：步骤 2/3 的裁剪、放大、编码是密集像素运算，统一由
-/// [buildRoisIsolate] + `compute` 调度到后台 isolate；主线程只保留
-/// `engine.recognize`（ML Kit 经插件调用，必须在主 isolate）和坐标映射，
-/// 导入图片时界面不再被 ROI 处理阻塞。
+/// 为什么只做姓名列、不做数字区：
+/// 1. 数字区 ROI 用 average 插值放大 1.8× 会把小数字糊掉，反而更差；
+/// 2. 数字/单价/表头本来就靠整图识别 + 解析器的抗倾斜对齐，ROI 重认只会把
+///    「元/车」「早/晚/合计」这些解析器必需的结构信息丢掉，导致解析失败。
+/// 3. 把所有姓名行拼成**一条竖条**、只调 1 次 ML Kit，识别次数从「每行 2 次
+///    (姓名+数字) 串行」降到「主识别 1 次 + 姓名条 1 次」，根治导入后长时间等待。
+///
+/// 图像运算（解码/裁剪/缩放/编码）仍为密集像素操作，但只剩 1 张竖条，开销极小，
+/// 直接在主线程完成即可；ML Kit 经插件必须在主线程调用。
 class RoiOcr {
-  /// 姓名列占图片宽度的最大比例（相对化，替代写死 90px）。
+  /// 姓名列占图片宽度的最大比例。
   static const double nameColumnRatio = 0.12;
 
-  /// 数字区二次识别放大倍数。
-  static const double numberZoom = 1.8;
+  /// 姓名条放大倍数（小字体更清晰）。
+  static const double nameZoom = 1.8;
 
-  /// 行高合并阈值相对平均行高的比例。
-  static const double rowMergeRatio = 0.55;
-
-  /// 对已有整图 OCR 结果做 ROI 增强。
+  /// 对整图 OCR 结果做「姓名列」定向增强。
   ///
-  /// [fullLines] 整图识别结果；[imagePath] 预处理后的图片路径；
-  /// [engine] 用于二次识别的引擎（通常仍是离线 ML Kit）；
-  /// [imageWidth] 预处理后图片宽度。
+  /// [fullLines] 整图识别结果（保留其全部结构/数字/表头）；[imagePath] 预处理后图片；
+  /// [engine] 用于二次识别的离线引擎；[imageWidth]/[imageHeight] 预处理后尺寸。
+  ///
+  /// 返回**融合后**的行列表：原样保留 fullLines，仅把匹配到的姓名行文本替换为
+  /// ROI 二次识别结果（更准的中文姓名）。任何异常都回退 fullLines，绝不越改越差。
   static Future<List<OcrLine>> refine({
     required List<OcrLine> fullLines,
     required String imagePath,
@@ -45,114 +45,101 @@ class RoiOcr {
   }) async {
     if (fullLines.isEmpty || imageWidth <= 0) return fullLines;
 
-    // 1. 估算姓名列右边界（相对宽度）。
-    final nameRight = _estimateNameColumnRight(fullLines, imageWidth);
-
-    // 2. 按垂直位置分组为逻辑行。
-    final rows = _groupRows(fullLines, imageHeight);
-
-    // 3. 构造每行的 ROI 参数（姓名区 + 数字区）。
-    final roiArgs = <Map<String, dynamic>>[];
-    for (final row in rows) {
-      if (row.isEmpty) continue;
-      final rowTop = row.map((l) => l.boundingBox?.top ?? 0).reduce(min);
-      final rowBottom = row.map((l) => l.boundingBox?.bottom ?? 0).reduce(max);
-      final pad = max(4.0, (rowBottom - rowTop) * 0.15);
-
-      roiArgs.add(<String, dynamic>{
-        'kind': 'name',
-        'box': <double>[
-          0,
-          max(0, rowTop - pad),
-          nameRight,
-          min(imageHeight.toDouble(), rowBottom + pad),
-        ],
-        'zoom': 1.6,
-      });
-      roiArgs.add(<String, dynamic>{
-        'kind': 'num',
-        'box': <double>[
-          nameRight,
-          max(0, rowTop - pad),
-          imageWidth.toDouble(),
-          min(imageHeight.toDouble(), rowBottom + pad),
-        ],
-        'zoom': numberZoom,
-      });
-    }
-    if (roiArgs.isEmpty) return fullLines;
-
-    // 4. 后台 isolate 构建所有 ROI 临时图（裁切/放大/编码密集运算不阻塞 UI）。
-    final bytes = await File(imagePath).readAsBytes();
-    final dir = (await getTemporaryDirectory()).path;
-    final built = await compute(
-      buildRoisIsolate,
-      <String, dynamic>{'bytes': bytes, 'dir': dir, 'rows': roiArgs},
-    );
-
-    // 5. 主 isolate 逐张 ML Kit 识别（插件必须在主 isolate）+ 坐标映射回原图。
-    final refined = <OcrLine>[];
-    for (final item in built) {
-      final path = item['path'] as String;
-      final kind = item['kind'] as String;
-      final box = item['box'].cast<num>();
-      final zoom = (item['zoom'] as num).toDouble();
-      final boxLeft = box[0].toDouble();
-      final boxTop = box[1].toDouble();
-      final boxRight = box[2].toDouble();
-      final boxBottom = box[3].toDouble();
-      try {
-        final lines = await engine.recognize(path);
-        for (final l in lines) {
-          if (kind == 'name') {
-            final t = l.text.replaceAll(RegExp(r'[^\u4e00-\u9fa5]'), '');
-            if (t.length >= 2 && t.length <= 4) {
-              refined.add(OcrLine(
-                text: t,
-                boundingBox:
-                    Rect.fromLTRB(boxLeft, boxTop, boxRight, boxBottom),
-              ));
-            }
-          } else {
-            final local = l.boundingBox;
-            if (local == null) {
-              refined.add(OcrLine(
-                text: l.text,
-                boundingBox:
-                    Rect.fromLTRB(boxLeft, boxTop, boxRight, boxBottom),
-              ));
-              continue;
-            }
-            // 二次识别图是放大后的，boundingBox 是放大图坐标，需缩回原图。
-            final invZoom = 1.0 / zoom;
-            refined.add(OcrLine(
-              text: l.text,
-              boundingBox: Rect.fromLTRB(
-                boxLeft + local.left * invZoom,
-                boxTop + local.top * invZoom,
-                boxLeft + local.right * invZoom,
-                boxTop + local.bottom * invZoom,
-              ),
-            ));
-          }
-        }
-      } catch (_) {
-        // 单张 ROI 失败不影响整体
-      } finally {
-        try {
-          await File(path).delete();
-        } catch (_) {}
+    // 1. 找出靠左、2~4 个纯中文的姓名行。
+    final nameRows = <OcrLine>[];
+    for (final l in fullLines) {
+      if (l.boundingBox == null) continue;
+      if (l.boundingBox!.left < imageWidth * nameColumnRatio &&
+          MonthlyReportParser.looksLikeNameLine(l.text)) {
+        nameRows.add(l);
       }
     }
+    if (nameRows.length < 2) return fullLines; // 太少没必要 ROI
+    nameRows.sort((a, b) => a.boundingBox!.top.compareTo(b.boundingBox!.top));
 
-    // 如果 ROI 几乎没产出，回退整图结果，避免越改越差。
-    if (refined.length < fullLines.length * 0.3) {
+    // 2. 姓名列上下边界 + 右边界。
+    final nameRight = _estimateNameColumnRight(fullLines, imageWidth);
+    final top = nameRows.first.boundingBox!.top - 6;
+    final bottom = nameRows.last.boundingBox!.bottom + 6;
+
+    // 3. 拼成一条姓名竖条（1 次解码 + 1 次裁剪 + 1 次缩放）。
+    File? stripFile;
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) return fullLines;
+
+      const left = 0;
+      final t = top.clamp(0, decoded.height - 1).round();
+      final r = nameRight.clamp(left + 1, decoded.width).round();
+      final b = bottom.clamp(t + 1, decoded.height).round();
+      if (b - t < 8) return fullLines;
+
+      var strip = img.copyCrop(decoded, x: left, y: t, width: r - left, height: b - t);
+      strip = img.copyResize(
+        strip,
+        width: ((r - left) * nameZoom).round(),
+        height: ((b - t) * nameZoom).round(),
+        interpolation: img.Interpolation.cubic,
+      );
+
+      final dir = (await getTemporaryDirectory()).path;
+      final stripPath =
+          '$dir/roi_name_${DateTime.now().microsecondsSinceEpoch}.jpg';
+      File(stripPath).writeAsBytesSync(img.encodeJpg(strip, quality: 95));
+      stripFile = File(stripPath);
+
+      // 4. 仅 1 次 ML Kit 识别。
+      final recognized = await engine.recognize(stripPath);
+
+      // 5. 按纵坐标把识别结果映射回各姓名行（竖条里 y 等比缩放）。
+      final rowCenters =
+          nameRows.map((l) => (l.boundingBox!.top + l.boundingBox!.bottom) / 2).toList();
+      final newTexts = List<String?>.filled(nameRows.length, null);
+      final tol = (b - t) / nameRows.length * 1.5;
+      for (final rl in recognized) {
+        final bb = rl.boundingBox;
+        if (bb == null) continue;
+        final stripCenter = (bb.top + bb.bottom) / 2;
+        final fullCenter = t + stripCenter / nameZoom;
+        int best = -1;
+        double bestD = double.infinity;
+        for (int i = 0; i < rowCenters.length; i++) {
+          final d = (rowCenters[i] - fullCenter).abs();
+          if (d < bestD) {
+            bestD = d;
+            best = i;
+          }
+        }
+        if (best >= 0 && bestD <= tol) {
+          final cn = rl.text.replaceAll(RegExp(r'[^\u4e00-\u9fa5]'), '');
+          if (cn.length >= 2 && cn.length <= 4) {
+            if (newTexts[best] == null || cn.length > newTexts[best]!.length) {
+              newTexts[best] = cn;
+            }
+          }
+        }
+      }
+
+      // 6. 融合：原样保留 fullLines，只替换命中的姓名文本。
+      final merged = fullLines.map((l) {
+        final idx = nameRows.indexOf(l);
+        if (idx >= 0 && newTexts[idx] != null) {
+          return l.copyWith(text: newTexts[idx]!);
+        }
+        return l;
+      }).toList();
+      return merged;
+    } catch (_) {
       return fullLines;
+    } finally {
+      try {
+        await stripFile?.delete();
+      } catch (_) {}
     }
-    return refined;
   }
 
-  /// 估算姓名列右边界：取靠左的中文姓名行的右边缘中位数，再与比例上限取 min。
+  /// 估算姓名列右边界：取靠左中文姓名行右边缘中位数，再与比例上限取 min。
   static double _estimateNameColumnRight(List<OcrLine> lines, int imageWidth) {
     final ratioCap = imageWidth * nameColumnRatio;
     final rights = <double>[];
@@ -169,93 +156,4 @@ class RoiOcr {
     final median = rights[rights.length ~/ 2];
     return min(max(median + 8, imageWidth * 0.06), ratioCap * 1.4);
   }
-
-  static List<List<OcrLine>> _groupRows(List<OcrLine> lines, int imageHeight) {
-    final sorted = [...lines]..sort((a, b) {
-        final ta = a.boundingBox?.top ?? 0;
-        final tb = b.boundingBox?.top ?? 0;
-        return ta.compareTo(tb);
-      });
-
-    // 估算平均行高
-    double avgH = 16;
-    final heights = sorted
-        .where((l) => l.boundingBox != null)
-        .map((l) => l.boundingBox!.height)
-        .where((h) => h > 4 && h < 80)
-        .toList();
-    if (heights.isNotEmpty) {
-      heights.sort();
-      avgH = heights[heights.length ~/ 2];
-    }
-    final mergeThresh = max(10.0, avgH * rowMergeRatio);
-
-    final rows = <List<OcrLine>>[];
-    for (final line in sorted) {
-      if (line.text.trim().isEmpty) continue;
-      final top = line.boundingBox?.top ?? 0;
-      bool placed = false;
-      for (final row in rows) {
-        final rowTop = row.first.boundingBox?.top ?? 0;
-        if ((top - rowTop).abs() < mergeThresh) {
-          row.add(line);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) rows.add([line]);
-    }
-    return rows;
-  }
-}
-
-/// 后台 isolate 入口：解码整图 → 逐行裁剪姓名区/数字区 → 放大 → 编码为临时文件。
-///
-/// 密集像素运算全部在此执行，返回每张 ROI 的临时图路径、类别与原始 box/zoom，
-/// 供主线程做 ML Kit 识别与坐标映射。参数/返回值均为可序列化基本类型。
-List<Map<String, dynamic>> buildRoisIsolate(Map<String, dynamic> args) {
-  final bytes = args['bytes'] as Uint8List;
-  final dir = args['dir'] as String;
-  final rows = (args['rows'] as List).cast<Map<String, dynamic>>();
-
-  final decoded = img.decodeImage(bytes);
-  if (decoded == null) return const [];
-
-  final out = <Map<String, dynamic>>[];
-  for (final r in rows) {
-    final kind = r['kind'] as String;
-    final box = (r['box'] as List).cast<num>();
-    final zoom = (r['zoom'] as num).toDouble();
-
-    final left = box[0].round().clamp(0, decoded.width - 1);
-    final top = box[1].round().clamp(0, decoded.height - 1);
-    final right = box[2].round().clamp(left + 1, decoded.width);
-    final bottom = box[3].round().clamp(top + 1, decoded.height);
-    final w = right - left;
-    final h = bottom - top;
-    if (w < 4 || h < 4) continue;
-
-    var crop = img.copyCrop(decoded, x: left, y: top, width: w, height: h);
-    if (zoom > 1.01) {
-      crop = img.copyResize(
-        crop,
-        width: (w * zoom).round(),
-        height: (h * zoom).round(),
-        interpolation: img.Interpolation.average,
-      );
-    }
-
-    final outPath =
-        '$dir/roi_${kind}_${DateTime.now().microsecondsSinceEpoch}_${out.length}.jpg';
-    File(outPath).writeAsBytesSync(img.encodeJpg(crop, quality: 92));
-
-    out.add(<String, dynamic>{
-      'path': outPath,
-      'kind': kind,
-      'box':
-          <double>[left.toDouble(), top.toDouble(), right.toDouble(), bottom.toDouble()],
-      'zoom': zoom,
-    });
-  }
-  return out;
 }
