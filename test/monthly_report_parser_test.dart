@@ -30,7 +30,7 @@ List<OcrLine> _monthLines({
   }
   lines.add(_line('合计', originX + daysInMonth * dayStep + dayStep * 0.5, 10, width: 40));
   lines.add(_line(name, 15, top, width: 40));
-  lines.add(_line('${price}元/车', 20, top + 22, width: 70));
+  lines.add(_line('$price元/车', 20, top + 22, width: 70));
   for (int d = 1; d <= daysInMonth; d++) {
     final base = originX + (d - 1) * dayStep + skew;
     final early = data?[d]?['早'] ?? 0;

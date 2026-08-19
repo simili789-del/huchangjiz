@@ -62,6 +62,9 @@ class ImagePreprocessor {
   /// 模糊告警阈值（拉普拉斯方差归一化后的下限）。
   static const double _blurThreshold = 0.05;
 
+  /// 清晰图快路径阈值：清晰度 ≥ 此值视为截图/清晰翻拍，跳过对比/锐化/绿底。
+  static const double _alreadySharpThreshold = 0.10;
+
   /// 目标短边最小像素（密集表格需要更高分辨率）。
   static const int _minShortSide = 1600;
 
@@ -103,20 +106,21 @@ class ImagePreprocessor {
         img = copyRotate(img, angle: angle, interpolation: Interpolation.cubic);
       }
 
-      // 3. 自适应对比度 + 轻微提亮（替代固定 contrast）。
-      img = _adaptiveContrast(img);
-
-      // 4. Unsharp Mask 锐化（对小数字特别有效）。
-      img = _unsharpMask(img, amount: 1.4, radius: 1.0, threshold: 4);
-
-      // 5. 绿底补偿：仅当图片确有大面积高饱和绿色（Excel 绿底高亮）才执行，
-      //    普通截图/纸张翻拍直接跳过，省掉一遍全图像素循环。
-      if (_hasGreenTint(img)) {
-        img = _suppressGreenHighlight(img);
+      // 2.5 清晰度预检快路径：电子表格截图本身清晰，无需再增强。
+      //     自适应对比/锐化/绿底是三遍全图像素循环，清晰图跳过可大幅提速；
+      //     照片（模糊/低对比）才走全增强。_estimateSharpness 在小图上算，开销低。
+      var sharpness = _estimateSharpness(img);
+      final alreadySharp = sharpness >= _alreadySharpThreshold;
+      if (!alreadySharp) {
+        // 不够清晰才全增强：自适应对比 + 锐化 + 绿底补偿。
+        // 清晰截图（快路径）只保留转正+缩放+纠斜。
+        img = _adaptiveContrast(img);
+        img = _unsharpMask(img, amount: 1.4, radius: 1.0, threshold: 4);
+        if (_hasGreenTint(img)) {
+          img = _suppressGreenHighlight(img);
+        }
+        sharpness = _estimateSharpness(img);
       }
-
-      // 6. 清晰度评分。
-      final sharpness = _estimateSharpness(img);
 
       // 7. 编码。
       final outBytes = encodeJpg(img, quality: 92);
