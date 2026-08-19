@@ -84,6 +84,24 @@ class _ReconciliationPageState extends ConsumerState<ReconciliationPage> {
       appBar: AppBar(
         title: const Text('月报对账'),
         actions: [
+          // 高精度（云端）开关：接好 CloudOcrEngine 后生效，未配置时自动降级离线
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '高精度',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Switch(
+                value: ref.watch(ocrHighPrecisionProvider),
+                onChanged: (v) =>
+                    ref.read(ocrHighPrecisionProvider.notifier).state = v,
+              ),
+            ],
+          ),
           if (state.imagePath != null)
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -116,7 +134,11 @@ class _Body extends ConsumerWidget {
           padding: EdgeInsets.all(24),
           child: Text(
             '拍下或选择会计发的「月度作业量汇总表」，开始智能对账。\n\n'
-            '📸 拍摄小贴士：请正对表格、光线充足、画面清晰，可显著提升识别准确率。',
+            '📸 拍摄小贴士：\n'
+            '· 横屏、完整表头、表格尽量铺满屏幕\n'
+            '· 手机与纸面/屏幕平行，避免透视变形\n'
+            '· 光线充足、无反光；模糊时请重拍\n'
+            '· 关键月报可打开右上角「高精度」开关',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 15),
           ),

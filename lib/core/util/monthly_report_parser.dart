@@ -27,6 +27,7 @@ class MonthlyReportParser {
     List<OcrLine> lines, {
     int? year,
     int? month,
+    int? imageWidth,
   }) {
     final now = DateTime.now();
     final y = year ?? now.year;
@@ -58,7 +59,7 @@ class MonthlyReportParser {
       final leftX = leftMost.boundingBox?.left ?? 0;
 
       // 人名行：靠左、2-4 个纯中文字符、不含数字。
-      if (leftX < _nameColumnRight && _looksLikeName(row)) {
+      if (leftX < nameColumnRight(imageWidth) && _looksLikeName(row)) {
         if (currentName != null && pendingPriceRows.isNotEmpty) {
           entries.addAll(_buildEntriesForPerson(
               currentName, pendingPriceRows, grid, daysInMonth));
@@ -374,8 +375,17 @@ class MonthlyReportParser {
   }
 }
 
-/// 姓名列最右侧边界：x < 此值视为姓名列内容。
-const double _nameColumnRight = 90;
+/// 姓名列最右侧边界默认值（无图片宽度时的兜底）。
+const double _nameColumnRightFallback = 90;
+
+/// 姓名列占图片宽度的比例上限。
+const double _nameColumnRatio = 0.12;
+
+/// 根据图片宽度计算姓名列右边界（相对化，适配不同分辨率）。
+double nameColumnRight(int? imageWidth) {
+  if (imageWidth == null || imageWidth <= 0) return _nameColumnRightFallback;
+  return imageWidth * _nameColumnRatio;
+}
 
 class _Grid {
   final double originX;
