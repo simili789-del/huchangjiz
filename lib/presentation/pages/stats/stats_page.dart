@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/job_types.dart';
+import '../../../domain/entities/work_record.dart';
 import '../../../core/util/share_file.dart';
 import '../../../data/serialization/record_serialization.dart';
 import '../../providers/repository_providers.dart';

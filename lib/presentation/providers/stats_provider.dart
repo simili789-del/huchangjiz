@@ -84,6 +84,7 @@ class MonthlyStats {
     required this.quantityByYard,
     required this.qtyByYardJob,
     required this.overtimeCountByDay,
+    required this.overtimeShiftsByDay,
     required this.totalOvertimeRecords,
   });
 }
