@@ -415,9 +415,7 @@ class _PriceGroupList extends StatelessWidget {
                       if (dayQty > 0) shiftParts.add('白$dayQty');
                       if (nightQty > 0) shiftParts.add('夜$nightQty');
                       final shiftText = shiftParts.join(' ');
-                      final label = shiftParts.length > 1
-                          ? '${d.key.day}号 $shiftText · ${d.value}'
-                          : '${d.key.day}号 $shiftText';
+                      final label = '${d.key.day}号 $shiftText';
                       return Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
