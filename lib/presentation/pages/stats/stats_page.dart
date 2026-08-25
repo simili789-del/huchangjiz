@@ -77,10 +77,10 @@ class StatsPage extends ConsumerWidget {
           _DailyBarChart(stats: stats),
           const SectionHeader('按单价分类汇总'),
           _PriceGroupList(stats: stats),
-          const SectionHeader('加班统计'),
-          _OvertimeStats(stats: stats),
           const SectionHeader('作业类型分布'),
           _JobTypeDistribution(stats: stats),
+          const SectionHeader('加班统计'),
+          _OvertimeStats(stats: stats),
           const SectionHeader('按人员统计'),
           _WorkerStats(stats: stats),
           const SectionHeader('按货场统计'),
@@ -417,70 +417,51 @@ class _OvertimeStats extends StatelessWidget {
     if (days.isEmpty) {
       return const _EmptyCard(text: '本月无加班记录');
     }
-    final dayCount = days.length;
-    final total = stats.totalOvertimeRecords;
-    return Column(
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                Icon(Icons.nightlight_round, size: 16, color: cs.error),
+                const SizedBox(width: 6),
+                Text(
+                  '共 ${stats.totalOvertimeRecords} 班 · ${days.length} 天',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: days.map((e) {
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
                     color: cs.errorContainer,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '加班',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: cs.onErrorContainer,
-                        ),
+                    '${e.key.month}月${e.key.day}日 · ${e.value}班',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onErrorContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const Spacer(),
-                Text(
-                  '$dayCount 天 · 共 $total 班',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ],
+                );
+              }).toList(),
             ),
-          ),
+          ],
         ),
-        ...days.map((e) => Card(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    Text(
-                      '${e.key.month}月${e.key.day}日',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        '${e.key.year}年',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                      ),
-                    ),
-                    Text(
-                      '${e.value} 班',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            )),
-      ],
+      ),
     );
   }
 }
