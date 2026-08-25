@@ -27,6 +27,9 @@ class RecordListCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final totalQty = record.jobQuantities.values.fold<int>(0, (a, b) => a + b);
     final isNight = record.shift == ShiftType.night;
+    final hasForklift = record.jobQuantities.entries
+            .any((e) => e.value > 0 && e.key.contains('叉车')) ||
+        (record.remark != null && record.remark!.contains('叉车'));
     final shiftColor = isNight ? cs.secondaryContainer : cs.tertiaryContainer;
     final shiftTextColor =
         isNight ? cs.onSecondaryContainer : cs.onTertiaryContainer;
@@ -106,6 +109,27 @@ class RecordListCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             color: cs.onErrorContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (hasForklift) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '叉车',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onPrimaryContainer,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
