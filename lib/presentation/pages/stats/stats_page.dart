@@ -426,7 +426,7 @@ class _PriceGroupList extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${d.key.day}号$shiftText·${d.value}车',
+                          '${d.key.day}号$shiftText·${d.value}',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
