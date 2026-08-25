@@ -404,8 +404,6 @@ class _PriceGroupList extends StatelessWidget {
                   ],
                 ),
                 if (days.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
                   const SizedBox(height: 8),
                   ...days.map((d) {
                     final dayQty = g.dayQtyByDay[d.key] ?? 0;
@@ -414,22 +412,26 @@ class _PriceGroupList extends StatelessWidget {
                     if (dayQty > 0) sub.add('白$dayQty');
                     if (nightQty > 0) sub.add('夜$nightQty');
                     return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 3),
                       child: Row(
                         children: [
-                          Text(
-                            '${d.key.month}月${d.key.day}号',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                          SizedBox(
+                            width: 40,
+                            child: Text(
+                              '${d.key.day}号',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
                           ),
-                          const Spacer(),
-                          if (sub.isNotEmpty)
+                          if (sub.isNotEmpty) ...[
                             Text(
                               sub.join(' '),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                   ),
                             ),
-                          if (sub.isNotEmpty) const SizedBox(width: 12),
+                            const SizedBox(width: 8),
+                          ],
+                          const Spacer(),
                           Text(
                             '${d.value}车',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
