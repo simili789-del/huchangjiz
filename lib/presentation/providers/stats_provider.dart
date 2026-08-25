@@ -65,6 +65,8 @@ class MonthlyStats {
 
   /// 按日聚合的加班记录数：日期 -> 加班记录条数（备注含『加班』即判加班）。
   final Map<DateTime, int> overtimeCountByDay;
+  /// 按日聚合的加班班次：日期 -> 涉及班次集合（用于显示某天是白班/夜班加班）。
+  final Map<DateTime, Set<ShiftType>> overtimeShiftsByDay;
   /// 当月加班记录总条数（即「加了几个班」）。
   final int totalOvertimeRecords;
 
@@ -126,6 +128,7 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
   int totalDayQty = 0;
   int totalNightQty = 0;
   final overtimeCountByDay = <DateTime, int>{};
+  final overtimeShiftsByDay = <DateTime, Set<ShiftType>>{};
   int totalOvertimeRecords = 0;
 
   for (final r in records) {
@@ -176,6 +179,7 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
 
     if (r.isOvertime) {
       overtimeCountByDay[dayKey] = (overtimeCountByDay[dayKey] ?? 0) + 1;
+      overtimeShiftsByDay[dayKey] = (overtimeShiftsByDay[dayKey] ?? <ShiftType>{})..add(r.shift);
       totalOvertimeRecords += 1;
     }
 
@@ -212,6 +216,7 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
     quantityByYard: quantityByYard,
     qtyByYardJob: qtyByYardJob,
     overtimeCountByDay: overtimeCountByDay,
+    overtimeShiftsByDay: overtimeShiftsByDay,
     totalOvertimeRecords: totalOvertimeRecords,
   );
 });

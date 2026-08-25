@@ -481,6 +481,17 @@ class _OvertimeStats extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: days.map((e) {
+                final shifts = stats.overtimeShiftsByDay[e.key] ?? <ShiftType>{};
+                String shiftLabel;
+                if (shifts.contains(ShiftType.day) && shifts.contains(ShiftType.night)) {
+                  shiftLabel = '白/夜';
+                } else if (shifts.contains(ShiftType.day)) {
+                  shiftLabel = '白';
+                } else if (shifts.contains(ShiftType.night)) {
+                  shiftLabel = '夜';
+                } else {
+                  shiftLabel = '班';
+                }
                 return Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
@@ -489,7 +500,7 @@ class _OvertimeStats extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${e.key.month}月${e.key.day}日 · ${e.value}班',
+                    '${e.key.month}月${e.key.day}日 · $shiftLabel',
                     style: TextStyle(
                       fontSize: 13,
                       color: cs.onErrorContainer,
