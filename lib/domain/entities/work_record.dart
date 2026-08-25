@@ -95,4 +95,8 @@ class WorkRecord extends HiveObject {
     });
     return total;
   }
+
+  /// 是否标记为「加班」：约定备注含『加班』即判加班
+  /// （与导入解析、OCR 对账「备注含『加班』即判加班」的约定一致）。
+  bool get isOvertime => remark != null && remark!.contains('加班');
 }

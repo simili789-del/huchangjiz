@@ -21,6 +21,7 @@ class HistoryFilter {
   final DateTime? customStart;
   final DateTime? customEnd;
   final HistorySort sort;
+  final bool overtimeOnly;
 
   const HistoryFilter({
     this.range = QuickRange.last7Days,
@@ -29,6 +30,7 @@ class HistoryFilter {
     this.customStart,
     this.customEnd,
     this.sort = HistorySort.dateDesc,
+    this.overtimeOnly = false,
   });
 
   HistoryFilter copyWith({
@@ -39,6 +41,7 @@ class HistoryFilter {
     DateTime? customEnd,
     HistorySort? sort,
     bool clearShift = false,
+    bool? overtimeOnly,
   }) {
     return HistoryFilter(
       range: range ?? this.range,
@@ -47,6 +50,7 @@ class HistoryFilter {
       customStart: customStart ?? this.customStart,
       customEnd: customEnd ?? this.customEnd,
       sort: sort ?? this.sort,
+      overtimeOnly: overtimeOnly ?? this.overtimeOnly,
     );
   }
 
@@ -96,6 +100,7 @@ final historyRecordsProvider = Provider<List<WorkRecord>>((ref) {
   var records = all.where((r) {
     if (r.date.isBefore(start) || r.date.isAfter(end)) return false;
     if (filter.shift != null && r.shift != filter.shift) return false;
+    if (filter.overtimeOnly && !r.isOvertime) return false;
     if (filter.keyword.isNotEmpty) {
       final k = filter.keyword.toLowerCase();
       if (!r.workerName.toLowerCase().contains(k) &&

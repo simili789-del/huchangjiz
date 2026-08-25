@@ -77,6 +77,8 @@ class StatsPage extends ConsumerWidget {
           _DailyBarChart(stats: stats),
           const SectionHeader('按单价分类汇总'),
           _PriceGroupList(stats: stats),
+          const SectionHeader('加班统计'),
+          _OvertimeStats(stats: stats),
           const SectionHeader('作业类型分布'),
           _JobTypeDistribution(stats: stats),
           const SectionHeader('按人员统计'),
@@ -398,6 +400,87 @@ class _PriceGroupList extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+class _OvertimeStats extends StatelessWidget {
+  final MonthlyStats stats;
+
+  const _OvertimeStats({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final days = stats.overtimeCountByDay.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    if (days.isEmpty) {
+      return const _EmptyCard(text: '本月无加班记录');
+    }
+    final dayCount = days.length;
+    final total = stats.totalOvertimeRecords;
+    return Column(
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '加班',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: cs.onErrorContainer,
+                        ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$dayCount 天 · 共 $total 班',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        ...days.map((e) => Card(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Text(
+                      '${e.key.month}月${e.key.day}日',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '${e.key.year}年',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
+                    Text(
+                      '${e.value} 班',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            )),
+      ],
     );
   }
 }

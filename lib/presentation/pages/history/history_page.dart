@@ -227,6 +227,12 @@ class _FilterPanel extends ConsumerWidget {
                   onTap: () => ref.read(historyFilterProvider.notifier).update(
                       (s) => s.copyWith(shift: ShiftType.night)),
                 ),
+                _QuickChip(
+                  label: '加班',
+                  active: filter.overtimeOnly,
+                  onTap: () => ref.read(historyFilterProvider.notifier).update(
+                      (s) => s.copyWith(overtimeOnly: !filter.overtimeOnly)),
+                ),
               ],
             ),
             const SizedBox(height: 12),

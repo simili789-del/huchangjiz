@@ -53,6 +53,11 @@ class MonthlyStats {
   /// 按货场 × 作业类型 聚合：货场 -> (作业类型 -> 车数)，供「看清哪个货场干啥活」。
   final Map<String, Map<String, int>> qtyByYardJob;
 
+  /// 按日聚合的加班记录数：日期 -> 加班记录条数（备注含『加班』即判加班）。
+  final Map<DateTime, int> overtimeCountByDay;
+  /// 当月加班记录总条数（即「加了几个班」）。
+  final int totalOvertimeRecords;
+
   const MonthlyStats({
     required this.month,
     required this.quantityByJobType,
@@ -66,6 +71,8 @@ class MonthlyStats {
     required this.totalNightQty,
     required this.quantityByYard,
     required this.qtyByYardJob,
+    required this.overtimeCountByDay,
+    required this.totalOvertimeRecords,
   });
 }
 
@@ -108,6 +115,8 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
   double totalIncome = 0;
   int totalDayQty = 0;
   int totalNightQty = 0;
+  final overtimeCountByDay = <DateTime, int>{};
+  int totalOvertimeRecords = 0;
 
   for (final r in records) {
     final amount = r.amount(unitPrices);
@@ -139,6 +148,11 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
     vehicleCountByDay[dayKey] = (vehicleCountByDay[dayKey] ?? 0) + qty;
     incomeByWorker[r.workerName] = (incomeByWorker[r.workerName] ?? 0) + amount;
     totalIncome += amount;
+
+    if (r.isOvertime) {
+      overtimeCountByDay[dayKey] = (overtimeCountByDay[dayKey] ?? 0) + 1;
+      totalOvertimeRecords += 1;
+    }
 
     if (r.shift == ShiftType.day) {
       totalDayQty += qty;
@@ -172,5 +186,7 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
     totalNightQty: totalNightQty,
     quantityByYard: quantityByYard,
     qtyByYardJob: qtyByYardJob,
+    overtimeCountByDay: overtimeCountByDay,
+    totalOvertimeRecords: totalOvertimeRecords,
   );
 });
