@@ -96,7 +96,14 @@ class WorkRecord extends HiveObject {
     return total;
   }
 
-  /// 是否标记为「加班」：约定备注含『加班』即判加班
-  /// （与导入解析、OCR 对账「备注含『加班』即判加班」的约定一致）。
-  bool get isOvertime => remark != null && remark!.contains('加班');
+  /// 是否标记为「加班」：备注含「加班 / 加时 / 加班费」或仅写「加」字即判加班。
+  /// 与 Excel 导入解析（excel_importer.dart）的判定规则保持一致。
+  bool get isOvertime {
+    if (remark == null || remark!.isEmpty) return false;
+    final r = remark!;
+    return r.contains('加班') ||
+        r.contains('加时') ||
+        r.contains('加班费') ||
+        r.trim() == '加';
+  }
 }
