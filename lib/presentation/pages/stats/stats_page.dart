@@ -405,43 +405,28 @@ class _PriceGroupList extends StatelessWidget {
                 ),
                 if (days.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  ...days.map((d) {
-                    final dayQty = g.dayQtyByDay[d.key] ?? 0;
-                    final nightQty = g.nightQtyByDay[d.key] ?? 0;
-                    final sub = <String>[];
-                    if (dayQty > 0) sub.add('白$dayQty');
-                    if (nightQty > 0) sub.add('夜$nightQty');
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 40,
-                            child: Text(
-                              '${d.key.day}号',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ),
-                          if (sub.isNotEmpty) ...[
-                            Text(
-                              sub.join(' '),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          const Spacer(),
-                          Text(
-                            '${d.value}车',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: days.map((d) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${d.key.day}号 · ${d.value}车',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ],
               ],
             ),
