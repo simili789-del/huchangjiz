@@ -409,6 +409,13 @@ class _PriceGroupList extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: days.map((d) {
+                      final dayQty = g.dayQtyByDay[d.key] ?? 0;
+                      final nightQty = g.nightQtyByDay[d.key] ?? 0;
+                      final shiftParts = <String>[];
+                      if (dayQty > 0) shiftParts.add('白$dayQty');
+                      if (nightQty > 0) shiftParts.add('夜$nightQty');
+                      final shiftText =
+                          shiftParts.isNotEmpty ? ' ${shiftParts.join(' ')}' : '';
                       return Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -419,7 +426,7 @@ class _PriceGroupList extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${d.key.day}号 · ${d.value}车',
+                          '${d.key.day}号$shiftText·${d.value}车',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
