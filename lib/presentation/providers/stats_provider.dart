@@ -11,12 +11,22 @@ class PriceGroup {
   final int nightQty;
   final List<String> jobTypes;
 
+  /// 该单价下按日聚合的车数：日期 -> 车数。
+  final Map<DateTime, int> qtyByDay;
+  /// 该单价下按日聚合的白班车数。
+  final Map<DateTime, int> dayQtyByDay;
+  /// 该单价下按日聚合的夜班车数。
+  final Map<DateTime, int> nightQtyByDay;
+
   const PriceGroup({
     required this.price,
     required this.totalQty,
     required this.dayQty,
     required this.nightQty,
     required this.jobTypes,
+    required this.qtyByDay,
+    required this.dayQtyByDay,
+    required this.nightQtyByDay,
   });
 }
 
@@ -136,12 +146,27 @@ final monthlyStatsProvider = Provider<MonthlyStats>((ref) {
       final existing = quantityByPrice[price];
       final dayAdd = r.shift == ShiftType.day ? q : 0;
       final nightAdd = r.shift == ShiftType.night ? q : 0;
+
+      final qtyByDay = Map<DateTime, int>.from(existing?.qtyByDay ?? {});
+      qtyByDay[dayKey] = (qtyByDay[dayKey] ?? 0) + q;
+      final dayQtyByDay = Map<DateTime, int>.from(existing?.dayQtyByDay ?? {});
+      if (dayAdd > 0) {
+        dayQtyByDay[dayKey] = (dayQtyByDay[dayKey] ?? 0) + dayAdd;
+      }
+      final nightQtyByDay = Map<DateTime, int>.from(existing?.nightQtyByDay ?? {});
+      if (nightAdd > 0) {
+        nightQtyByDay[dayKey] = (nightQtyByDay[dayKey] ?? 0) + nightAdd;
+      }
+
       quantityByPrice[price] = PriceGroup(
         price: price,
         totalQty: (existing?.totalQty ?? 0) + q,
         dayQty: (existing?.dayQty ?? 0) + dayAdd,
         nightQty: (existing?.nightQty ?? 0) + nightAdd,
         jobTypes: <String>{...(existing?.jobTypes ?? <String>[]), jobType}.toList(),
+        qtyByDay: qtyByDay,
+        dayQtyByDay: dayQtyByDay,
+        nightQtyByDay: nightQtyByDay,
       );
     });
 

@@ -365,36 +365,82 @@ class _PriceGroupList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final entries = stats.quantityByPrice.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
     return Column(
       children: entries.map((e) {
         final g = e.value;
         final amount = g.totalQty * g.price;
+        final days = g.qtyByDay.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '¥${g.price.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    Text(
+                      '¥${g.price.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        g.jobTypes.join('、'),
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
+                    ),
+                    Text(
+                      '${g.totalQty}车 · ¥${amount.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    g.jobTypes.join('、'),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-                Text(
-                  '${g.totalQty}车 · ¥${amount.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                if (days.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 8),
+                  ...days.map((d) {
+                    final dayQty = g.dayQtyByDay[d.key] ?? 0;
+                    final nightQty = g.nightQtyByDay[d.key] ?? 0;
+                    final sub = <String>[];
+                    if (dayQty > 0) sub.add('白$dayQty');
+                    if (nightQty > 0) sub.add('夜$nightQty');
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${d.key.month}月${d.key.day}号',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const Spacer(),
+                          if (sub.isNotEmpty)
+                            Text(
+                              sub.join(' '),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                            ),
+                          if (sub.isNotEmpty) const SizedBox(width: 12),
+                          Text(
+                            '${d.value}车',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
                       ),
-                ),
+                    );
+                  }),
+                ],
               ],
             ),
           ),
