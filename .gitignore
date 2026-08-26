@@ -12,6 +12,7 @@ pubspec.lock
 *.aab
 *.jks
 *.keystore
+key.properties
 local.properties
 android/.gradle/
 android/app/debug/
