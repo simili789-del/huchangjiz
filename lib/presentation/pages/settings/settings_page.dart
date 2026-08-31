@@ -15,6 +15,7 @@ import '../../../domain/entities/salary_settings.dart';
 import '../../providers/app_settings_provider.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/qwen_providers.dart';
+import '../../providers/reconciliation_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/selected_date_record_provider.dart';
 import '../../widgets/section_header.dart';
@@ -967,7 +968,7 @@ class _OcrSectionState extends ConsumerState<_OcrSection> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: _model,
+                  value: _model,
                   decoration: const InputDecoration(
                     labelText: '模型',
                     border: OutlineInputBorder(),
