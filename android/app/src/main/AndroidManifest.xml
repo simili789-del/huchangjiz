@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- 月报对账：从相册选择图片（Android 13+ 需此权限） -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- 云端 OCR：调用阿里云 DashScope Qwen-VL API -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:label="货场作业记账"

@@ -11,10 +11,14 @@ import '../../data/repositories/reconciliation_draft_repository.dart';
 import '../../data/repositories/reconciliation_service.dart';
 import '../../data/repositories/record_repository.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../../domain/entities/monthly_report.dart';
 import '../../domain/entities/ocr_result.dart';
 import '../../domain/entities/reconciliation_result.dart';
+import 'qwen_providers.dart';
 
 /// 离线 OCR 引擎。autoDispose：离开对账页释放 native 模型。
+/// 云端引擎在「高精度」开关被打开时由 [ReconciliationNotifier.recognize]
+/// 从 [qwenVlEngineOrNullProvider] 异步读取后通过 [OcrRepository.setCloudEngine] 注入。
 final ocrRepositoryProvider = Provider.autoDispose<OcrRepository>((ref) {
   final repo = OcrRepository(
     mode: OcrEngineMode.offline,
@@ -26,6 +30,13 @@ final ocrRepositoryProvider = Provider.autoDispose<OcrRepository>((ref) {
 
 /// 高精度（云端）开关。默认关闭，用户可在对账页打开。
 final ocrHighPrecisionProvider = StateProvider.autoDispose<bool>((ref) => false);
+
+/// API Key 是否已配置（用于对账页右上角 Switch 的「未配置」提示）。
+final qwenApiKeyConfiguredProvider = FutureProvider<bool>((ref) async {
+  final repo = ref.watch(secureSettingsRepositoryProvider);
+  final key = await repo.getApiKey();
+  return key != null && key.isNotEmpty;
+});
 
 final reconciliationDraftRepositoryProvider =
     Provider<ReconciliationDraftRepository>((ref) {
@@ -59,6 +70,12 @@ class ReconciliationState {
   final int imageWidth;
   final int imageHeight;
 
+  /// 云端 Qwen-VL 直出的结构化月报。非 null 时对账应跳过 [MonthlyReportParser]。
+  final MonthlyReport? structuredReport;
+
+  /// 最近一次云端调用错误（UI snackbar 提示用）。null = 无错误或未走云端。
+  final String? cloudWarning;
+
   const ReconciliationState({
     this.imagePath,
     this.lines = const [],
@@ -72,6 +89,8 @@ class ReconciliationState {
     this.result,
     this.imageWidth = 0,
     this.imageHeight = 0,
+    this.structuredReport,
+    this.cloudWarning,
   });
 
   ReconciliationState copyWith({
@@ -87,8 +106,11 @@ class ReconciliationState {
     ReconciliationResult? result,
     int? imageWidth,
     int? imageHeight,
+    MonthlyReport? structuredReport,
+    String? cloudWarning,
     bool clearImage = false,
     bool clearResult = false,
+    bool clearStructured = false,
   }) {
     return ReconciliationState(
       imagePath: clearImage ? null : (imagePath ?? this.imagePath),
@@ -103,6 +125,9 @@ class ReconciliationState {
       result: clearResult ? null : (result ?? this.result),
       imageWidth: imageWidth ?? this.imageWidth,
       imageHeight: imageHeight ?? this.imageHeight,
+      structuredReport:
+          clearStructured ? null : (structuredReport ?? this.structuredReport),
+      cloudWarning: cloudWarning ?? this.cloudWarning,
     );
   }
 }
@@ -131,12 +156,30 @@ class ReconciliationNotifier extends StateNotifier<ReconciliationState> {
       errorMessage: null,
       saved: false,
       clearResult: true,
+      clearStructured: true,
     );
     try {
       // 根据高精度开关切换引擎
       final highPrecision = _ref.read(ocrHighPrecisionProvider);
       _ocr.mode =
           highPrecision ? OcrEngineMode.cloud : OcrEngineMode.offline;
+
+      // 云端模式：从 secure storage 异步加载 Qwen 引擎并注入到 OcrRepository
+      if (highPrecision) {
+        final engine = await _ref.read(qwenVlEngineOrNullProvider.future);
+        if (engine == null) {
+          // 未配 key：自动降级 offline + 提示
+          _ocr.setCloudEngine(null);
+          _ocr.mode = OcrEngineMode.offline;
+          state = state.copyWith(
+            cloudWarning: '未配置阿里云 API Key，已自动降级离线识别',
+          );
+        } else {
+          _ocr.setCloudEngine(engine);
+        }
+      } else {
+        _ocr.setCloudEngine(null);
+      }
 
       final rec = await _ocr.recognize(imagePath);
 
@@ -146,17 +189,23 @@ class ReconciliationNotifier extends StateNotifier<ReconciliationState> {
         } catch (_) {}
       }
 
-      // 姓名词典校正
-      final known = NameMatcher.collectKnownNames(_recordRepo, _settingsRepo);
-      final correctedLines = rec.lines.map((l) {
-        if (MonthlyReportParser.looksLikeNameLine(l.text)) {
-          final fixed = NameMatcher.bestMatch(l.text, known);
-          if (fixed != null && fixed != l.text) {
-            return l.copyWith(text: fixed);
+      // 行级路径：姓名词典校正（云端结构化路径无需此步）
+      var correctedLines = rec.lines;
+      if (rec.structuredReport == null) {
+        final known = NameMatcher.collectKnownNames(_recordRepo, _settingsRepo);
+        correctedLines = rec.lines.map((l) {
+          if (MonthlyReportParser.looksLikeNameLine(l.text)) {
+            final fixed = NameMatcher.bestMatch(l.text, known);
+            if (fixed != null && fixed != l.text) {
+              return l.copyWith(text: fixed);
+            }
           }
-        }
-        return l;
-      }).toList();
+          return l;
+        }).toList();
+      }
+
+      // 合并 cloud warning
+      String? mergedWarning = state.cloudWarning ?? _ocr.lastCloudError;
 
       state = state.copyWith(
         lines: correctedLines,
@@ -166,6 +215,8 @@ class ReconciliationNotifier extends StateNotifier<ReconciliationState> {
         processing: false,
         imageWidth: rec.imageWidth,
         imageHeight: rec.imageHeight,
+        structuredReport: rec.structuredReport,
+        cloudWarning: mergedWarning,
       );
     } catch (e, st) {
       debugPrint('OCR 失败: $e\n$st');
@@ -190,19 +241,30 @@ class ReconciliationNotifier extends StateNotifier<ReconciliationState> {
   }
 
   Future<void> reconcile({int? year, int? month}) async {
-    if (state.lines.isEmpty) return;
+    if (state.lines.isEmpty && state.structuredReport == null) return;
     state = state.copyWith(reconciling: true, hasError: false, errorMessage: null);
     try {
       final now = DateTime.now();
       final y = year ?? now.year;
       final m = month ?? now.month;
 
-      final report = MonthlyReportParser.parse(
-        state.lines,
-        year: y,
-        month: m,
-        imageWidth: state.imageWidth > 0 ? state.imageWidth : null,
-      );
+      final MonthlyReport report;
+      if (state.structuredReport != null) {
+        // 云端直出：直接用 Qwen-VL 返回的结构化月报，跳过行级解析器（accuracy 最高）
+        report = state.structuredReport!;
+        // 如果用户没指定年月，用结构化报告自带的
+        if (year == null && month == null) {
+          // 已在 report.year/month；不影响后续 start/end
+        }
+      } else {
+        // 行级路径：老逻辑不变
+        report = MonthlyReportParser.parse(
+          state.lines,
+          year: y,
+          month: m,
+          imageWidth: state.imageWidth > 0 ? state.imageWidth : null,
+        );
+      }
 
       final start = DateTime(y, m, 1);
       final end = DateTime(y, m + 1, 0, 23, 59, 59);

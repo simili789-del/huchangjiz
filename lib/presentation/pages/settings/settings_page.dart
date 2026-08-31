@@ -10,9 +10,11 @@ import '../../../core/constants/job_types.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/util/share_file.dart';
 import '../../../data/serialization/record_serialization.dart';
+import '../../../data/repositories/qwen_vl_ocr_engine.dart';
 import '../../../domain/entities/salary_settings.dart';
 import '../../providers/app_settings_provider.dart';
 import '../../providers/history_provider.dart';
+import '../../providers/qwen_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/selected_date_record_provider.dart';
 import '../../widgets/section_header.dart';
@@ -33,6 +35,7 @@ class SettingsPage extends ConsumerWidget {
           _SalarySection(),
           _AppearanceSection(),
           _TargetSection(),
+          _OcrSection(),
           _BackupSection(),
         ],
       ),
@@ -791,6 +794,228 @@ class _TargetSectionState extends ConsumerState<_TargetSection> {
                     },
                     child: const Text('保存目标设置'),
                   ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OcrSection extends ConsumerStatefulWidget {
+  const _OcrSection();
+
+  @override
+  ConsumerState<_OcrSection> createState() => _OcrSectionState();
+}
+
+class _OcrSectionState extends ConsumerState<_OcrSection> {
+  final _keyCtrl = TextEditingController();
+  final _urlCtrl = TextEditingController();
+  String _model = 'qwen-vl-plus';
+  bool _obscure = true;
+  bool _busy = false;
+  bool _synced = false;
+
+  @override
+  void dispose() {
+    _keyCtrl.dispose();
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final repo = ref.read(secureSettingsRepositoryProvider);
+    final key = await repo.getApiKey() ?? '';
+    final url = await repo.getBaseUrl();
+    final model = await repo.getModel();
+    if (!mounted) return;
+    setState(() {
+      _keyCtrl.text = key;
+      _urlCtrl.text = url;
+      _model = model;
+      _synced = true;
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() => _busy = true);
+    try {
+      final repo = ref.read(secureSettingsRepositoryProvider);
+      await repo.saveAll(
+        apiKey: _keyCtrl.text.trim(),
+        baseUrl: _urlCtrl.text.trim().isEmpty
+            ? 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+            : _urlCtrl.text.trim(),
+        model: _model,
+      );
+      // 失效相关 provider 以便对账页重新加载
+      ref.invalidate(qwenApiKeyProvider);
+      ref.invalidate(qwenVlEngineOrNullProvider);
+      ref.invalidate(qwenApiKeyConfiguredProvider);
+      if (mounted) _snack('已保存（API Key 已加密存至 Android Keystore）');
+    } catch (e) {
+      if (mounted) _snack('保存失败：$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _test() async {
+    if (_keyCtrl.text.trim().isEmpty) {
+      _snack('请先填入 API Key');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      // 临时构造一个引擎测试（不保存）
+      final engine = QwenVlOcrEngine(
+        apiKey: _keyCtrl.text.trim(),
+        baseUrl: _urlCtrl.text.trim().isEmpty
+            ? 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+            : _urlCtrl.text.trim(),
+        model: _model,
+      );
+      final ok = await engine.testConnection();
+      engine.dispose();
+      if (mounted) {
+        _snack(ok ? '✓ 连接成功' : '✗ 连接失败，请检查 Key / 模型名 / 网络');
+      }
+    } catch (e) {
+      if (mounted) _snack('测试失败：$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_synced) {
+      // 首次构建异步加载已有配置
+      _load();
+    }
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('云端识别 / OCR'),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '配置阿里云通义千问 Qwen-VL API 后，对账页开启「高精度」即可让云端大模型直接读表，'
+                  '跳过行级 OCR + 网格解析器，准确率大幅提升（密集表 + 紫底加班 cell 尤为明显）。',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: cs.tertiaryContainer.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: cs.tertiary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '图片会上传至阿里云 DashScope 进行识别。Key 通过 Android Keystore 加密存储。',
+                          style: TextStyle(fontSize: 12, color: cs.onSurface),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _keyCtrl,
+                  obscureText: _obscure,
+                  decoration: InputDecoration(
+                    labelText: 'API Key（DashScope / 百炼）',
+                    hintText: 'sk-xxxxxxxxxxxxxxxx',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _urlCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Base URL',
+                    hintText: '默认百炼兼容端点，无需修改',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _model,
+                  decoration: const InputDecoration(
+                    labelText: '模型',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'qwen-vl-plus',
+                      child: Text('qwen-vl-plus · 性价比（推荐）'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'qwen-vl-max',
+                      child: Text('qwen-vl-max · 最准（费用高）'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'qwen2.5-vl-72b-instruct',
+                      child: Text('qwen2.5-vl-72b-instruct · 开源大杯'),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => _model = v);
+                  },
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _busy ? null : _save,
+                        icon: const Icon(Icons.save_outlined, size: 18),
+                        label: const Text('保存'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : _test,
+                        icon: const Icon(Icons.wifi_tethering, size: 18),
+                        label: const Text('测试连接'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '获取 Key：阿里云 → 百炼大模型平台 → API-Key 管理 → 创建我的 API-Key',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                 ),
               ],
             ),

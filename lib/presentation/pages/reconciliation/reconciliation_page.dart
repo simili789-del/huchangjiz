@@ -80,11 +80,28 @@ class _ReconciliationPageState extends ConsumerState<ReconciliationPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(reconciliationStateProvider);
+    final keyConfigured =
+        ref.watch(qwenApiKeyConfiguredProvider).valueOrNull ?? false;
+
+    // 云端降级/未配 key 提示（snackbar）
+    ref.listen(reconciliationStateProvider, (prev, next) {
+      final w = next.cloudWarning;
+      if (w != null && w != prev?.cloudWarning && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(w),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('月报对账'),
         actions: [
-          // 高精度（云端）开关：接好 CloudOcrEngine 后生效，未配置时自动降级离线
+          // 高精度（云端）开关 + Key 状态点
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -95,10 +112,32 @@ class _ReconciliationPageState extends ConsumerState<ReconciliationPage> {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
+              Tooltip(
+                message: keyConfigured ? '阿里云 Qwen-VL 已就绪' : '未配置 API Key（去设置）',
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(left: 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: keyConfigured ? Colors.green : Colors.orange,
+                  ),
+                ),
+              ),
               Switch(
                 value: ref.watch(ocrHighPrecisionProvider),
-                onChanged: (v) =>
-                    ref.read(ocrHighPrecisionProvider.notifier).state = v,
+                onChanged: (v) {
+                  if (v && !keyConfigured) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('请先到「设置 → 云端识别」配置阿里云 API Key'),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                    return;
+                  }
+                  ref.read(ocrHighPrecisionProvider.notifier).state = v;
+                },
               ),
             ],
           ),
@@ -199,6 +238,29 @@ class _Body extends ConsumerWidget {
                   child: Text(
                     '照片有点模糊，识别可能不准，建议重拍一张更清晰的。',
                     style: TextStyle(fontSize: 13, color: Colors.orange),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (state.structuredReport != null)
+          Container(
+            margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.cloud_done_outlined, color: Colors.green, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Qwen-VL 云端直出 ${state.structuredReport!.entries.length} 个员工 · '
+                    '${state.structuredReport!.totalCars} 车 · 已跳过行级识别器，准确率最高',
+                    style: const TextStyle(fontSize: 13, color: Colors.green),
                   ),
                 ),
               ],

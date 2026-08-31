@@ -46,6 +46,10 @@ dependencies:
   # OCR 前图像预处理（转正/放大/纠斜/提对比/清晰度检测），纯 Dart，无原生依赖。
   image: ^4.2.0
 
+  # 阿里云 Qwen-VL 云端 OCR：HTTP 调用 + Android Keystore 加密存 API Key
+  http: ^1.2.0
+  flutter_secure_storage: ^9.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

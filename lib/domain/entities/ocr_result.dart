@@ -1,5 +1,7 @@
 import 'dart:ui' show Rect;
 
+import 'monthly_report.dart';
+
 /// OCR 识别出的一行文本（含位置框，供表格解析按坐标归位使用）。
 class OcrLine {
   final String text;
@@ -57,6 +59,10 @@ class OcrRecognition {
   /// 预处理后图片高度。
   final int imageHeight;
 
+  /// 云端直出的结构化月报（非 null 时下游应跳过 [MonthlyReportParser]）。
+  /// 仅 [OcrEngineMode.cloud] 模式下、Qwen-VL 返回成功时填充。
+  final MonthlyReport? structuredReport;
+
   OcrRecognition({
     required this.processedImagePath,
     required this.lines,
@@ -64,5 +70,6 @@ class OcrRecognition {
     required this.blurry,
     this.imageWidth = 0,
     this.imageHeight = 0,
+    this.structuredReport,
   });
 }

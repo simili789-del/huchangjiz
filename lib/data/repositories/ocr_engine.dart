@@ -1,13 +1,19 @@
+import '../../domain/entities/monthly_report.dart';
 import '../../domain/entities/ocr_result.dart';
 
-/// OCR 引擎抽象：支持离线 ML Kit 与可选云端高精度双引擎。
+/// OCR 引擎抽象：支持离线 ML Kit 与云端高精度双引擎。
 ///
 /// 使用方式：
 /// - 默认 [OcrEngineMode.offline] → ML Kit 中文离线
-/// - 用户打开「高精度识别」开关 → [OcrEngineMode.cloud]（需实现 CloudOcrEngine）
+/// - 用户打开「高精度识别」开关 → [OcrEngineMode.cloud]（需实现 QwenVlOcrEngine）
 abstract class OcrEngine {
-  /// 识别图片，返回带坐标的文本行。
+  /// 识别图片，返回带坐标的文本行（行级 OCR，老路径，离线 ML Kit 用）。
   Future<List<OcrLine>> recognize(String imagePath);
+
+  /// 云端直出结构化月报（高准确率路径）。
+  /// 离线引擎默认返回 null；QwenVlOcrEngine 实现此方法。
+  /// 返回 null 表示该引擎不支持结构化直出，调用方应降级到 [recognize] + 行级解析。
+  Future<MonthlyReport?> recognizeStructured(String imagePath) async => null;
 
   /// 释放资源。
   void dispose();
@@ -34,17 +40,38 @@ class DualOcrEngine implements OcrEngine {
         _cloud = cloud;
 
   final OcrEngine _offline;
-  final OcrEngine? _cloud;
+  OcrEngine? _cloud;
   OcrEngineMode mode;
 
-  OcrEngine get _active {
+  /// 云端引擎是否已配置（供 OcrRepository 判断是否走云端结构化路径）。
+  bool get hasCloud => _cloud != null;
+
+  /// 运行时设置/替换云端引擎（secure storage 异步加载完成后挂载）。
+  set cloud(OcrEngine? engine) => _cloud = engine;
+
+  OcrEngine? get _active {
     if (mode == OcrEngineMode.cloud && _cloud != null) return _cloud;
     return _offline;
   }
 
   @override
-  Future<List<OcrLine>> recognize(String imagePath) =>
-      _active.recognize(imagePath);
+  Future<List<OcrLine>> recognize(String imagePath) async {
+    final engine = _active;
+    if (engine == null) {
+      // 云端模式但未注入引擎：降级离线
+      return _offline.recognize(imagePath);
+    }
+    return engine.recognize(imagePath);
+  }
+
+  @override
+  Future<MonthlyReport?> recognizeStructured(String imagePath) async {
+    // 只在云端引擎可用时尝试；离线引擎返回 null（基类默认）。
+    if (mode == OcrEngineMode.cloud && _cloud != null) {
+      return _cloud!.recognizeStructured(imagePath);
+    }
+    return null;
+  }
 
   @override
   void dispose() {
@@ -84,6 +111,9 @@ class CloudOcrEngine implements OcrEngine {
       'CloudOcrEngine 未配置 client。请接入百度/腾讯表格 OCR 后注入 client 回调。',
     );
   }
+
+  @override
+  Future<MonthlyReport?> recognizeStructured(String imagePath) async => null;
 
   @override
   void dispose() {}
