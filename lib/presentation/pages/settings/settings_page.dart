@@ -966,7 +966,10 @@ class _OcrSectionState extends ConsumerState<_OcrSection> {
                   controller: _urlCtrl,
                   decoration: const InputDecoration(
                     labelText: 'Base URL',
-                    hintText: '默认百炼兼容端点，无需修改',
+                    helperText:
+                        '填完整地址，或只填到 /compatible-mode/v1（会自动补 /chat/completions）',
+                    helperMaxLines: 2,
+                    hintText: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
                     border: OutlineInputBorder(),
                   ),
                 ),

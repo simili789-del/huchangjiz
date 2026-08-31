@@ -21,15 +21,33 @@ import 'secure_settings_repository.dart';
 class QwenVlOcrEngine implements OcrEngine {
   QwenVlOcrEngine({
     required this.apiKey,
-    this.baseUrl = SecureSettingsRepository.defaultBaseUrl,
+    String? baseUrl,
     this.model = SecureSettingsRepository.defaultModel,
     http.Client? client,
-  }) : _client = client ?? http.Client();
+  })  : baseUrl = normalizeBaseUrl(baseUrl),
+        _client = client ?? http.Client();
 
   final String apiKey;
   final String baseUrl;
   final String model;
   final http.Client _client;
+
+  /// 规范化 Base URL：自动补齐 `/chat/completions` 后缀。
+  ///
+  /// 关键差异：OpenAI Python SDK 的 `base_url` 只需填到 `/v1`，SDK 会自动补
+  /// `/chat/completions`；但本引擎是**直接 POST 到该 URL**，需要完整路径。
+  /// 用户照官方文档填 `.../compatible-mode/v1` 会拿到 HTTP 404（已实测复现），
+  /// 这里统一兜底，两种写法都能正常用。
+  static String normalizeBaseUrl(String? raw) {
+    var url = (raw ?? '').trim();
+    if (url.isEmpty) return SecureSettingsRepository.defaultBaseUrl;
+    // 去掉结尾多余斜杠
+    while (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    if (url.endsWith('/chat/completions')) return url;
+    return '$url/chat/completions';
+  }
 
   /// 单次请求超时：Qwen-VL 大表需 10~20s，给 60s 留余量。
   static const _timeout = Duration(seconds: 60);
@@ -131,6 +149,11 @@ class QwenVlOcrEngine implements OcrEngine {
           )
           .timeout(const Duration(seconds: 15));
       if (resp.statusCode == 200) return null;
+      // 404：路径不对。已自动补 /chat/completions 还 404，多半是域名写错。
+      if (resp.statusCode == 404) {
+        return 'HTTP 404 地址不存在 → 实际请求: $baseUrl'
+            '\n请检查域名（应为 dashscope.aliyuncs.com）与路径';
+      }
       return 'HTTP ${resp.statusCode}: ${_truncate(resp.body, 160)}';
     } on SocketException catch (e) {
       return 'DNS/网络失败: ${e.message}（请检查 Base URL 与网络）';
