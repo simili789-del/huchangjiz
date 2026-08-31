@@ -63,7 +63,7 @@ class QwenVlOcrEngine implements OcrEngine {
           ],
         },
       ],
-      'response_format': {'type': 'json_object'},
+      // 'response_format': {'type': 'json_object'},  // 不传：DashScope 兼容模式可能不支持，导致 400
       'temperature': 0.0,
       'max_tokens': 8000,
     });
@@ -95,9 +95,13 @@ class QwenVlOcrEngine implements OcrEngine {
     return _parseReport(content);
   }
 
-  /// 轻量连通性测试：发最小 payload 验证 key 有效。
-  Future<bool> testConnection() async {
-    if (apiKey.isEmpty) return false;
+  /// 连通性测试：发最小 payload 验证 key 与网络。返回 null = 成功；
+  /// 否则返回人类可读的具体错误原因（snackbar 直接显示）。
+  ///
+  /// 注意：不传 `response_format` —— 该参数是 OpenAI 原生参数，
+  /// DashScope OpenAI 兼容模式可能不支持，会返回 400，导致测试/识别都失败。
+  Future<String?> testConnection() async {
+    if (apiKey.isEmpty) return 'API Key 为空';
     try {
       // 1x1 透明 PNG
       const tinyPng =
@@ -109,12 +113,12 @@ class QwenVlOcrEngine implements OcrEngine {
             'role': 'user',
             'content': [
               {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,$tinyPng'}},
-              {'type': 'text', 'text': '输出 {"ok": true}'},
+              {'type': 'text', 'text': 'hi'},
             ],
           },
         ],
-        'response_format': {'type': 'json_object'},
-        'max_tokens': 16,
+        // 'response_format': {'type': 'json_object'},  // 故意不传，见方法注释
+        'max_tokens': 32,
       });
       final resp = await _client
           .post(
@@ -126,9 +130,14 @@ class QwenVlOcrEngine implements OcrEngine {
             body: body,
           )
           .timeout(const Duration(seconds: 15));
-      return resp.statusCode == 200;
-    } catch (_) {
-      return false;
+      if (resp.statusCode == 200) return null;
+      return 'HTTP ${resp.statusCode}: ${_truncate(resp.body, 160)}';
+    } on SocketException catch (e) {
+      return 'DNS/网络失败: ${e.message}（请检查 Base URL 与网络）';
+    } on TimeoutException {
+      return '请求超时 (15s)，请检查网络';
+    } catch (e) {
+      return '异常: $e';
     }
   }
 
@@ -202,12 +211,18 @@ class QwenVlOcrEngine implements OcrEngine {
   MonthlyReport? _parseReport(String content) {
     try {
       var raw = content.trim();
-      // 容错：去掉 ```json ... ``` 围栏
+      // 容错 1：去掉 ```json ... ``` / ``` ... ``` 围栏
       if (raw.startsWith('```')) {
         final newline = raw.indexOf('\n');
         if (newline > 0) raw = raw.substring(newline + 1);
         if (raw.endsWith('```')) raw = raw.substring(0, raw.length - 3);
         raw = raw.trim();
+      }
+      // 容错 2：若有前导废话（如 "Here is the JSON:"），截到首个 { 与末个 } 之间
+      final firstBrace = raw.indexOf('{');
+      final lastBrace = raw.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        raw = raw.substring(firstBrace, lastBrace + 1);
       }
       final j = jsonDecode(raw) as Map<String, dynamic>;
       final year = (j['year'] as num?)?.toInt() ?? DateTime.now().year;

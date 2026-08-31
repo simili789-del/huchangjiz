@@ -879,10 +879,14 @@ class _OcrSectionState extends ConsumerState<_OcrSection> {
             : _urlCtrl.text.trim(),
         model: _model,
       );
-      final ok = await engine.testConnection();
+      final err = await engine.testConnection();
       engine.dispose();
       if (mounted) {
-        _snack(ok ? '✓ 连接成功' : '✗ 连接失败，请检查 Key / 模型名 / 网络');
+        if (err == null) {
+          _snack('✓ 连接成功');
+        } else {
+          _snack('✗ $err');
+        }
       }
     } catch (e) {
       if (mounted) _snack('测试失败：$e');
