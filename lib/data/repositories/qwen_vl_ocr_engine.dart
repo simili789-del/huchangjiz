@@ -121,9 +121,10 @@ class QwenVlOcrEngine implements OcrEngine {
   Future<String?> testConnection() async {
     if (apiKey.isEmpty) return 'API Key 为空';
     try {
-      // 1x1 透明 PNG
+      // 用 32x32 透明 PNG（最小合法尺寸，Qwen-VL 要求边长 >= 32）。
+      // 历史：用 1x1 PNG 被服务端拒 -> HTTP 400 InvalidParameter。
       const tinyPng =
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+          'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAGklEQVR4nO3BAQEAAACCIP+vbkhAAQAAAO8GECAAARlDNO4AAAAASUVORK5CYII=';
       final body = jsonEncode({
         'model': model,
         'messages': [
