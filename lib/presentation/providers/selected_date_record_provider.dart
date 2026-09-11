@@ -185,6 +185,7 @@ class SelectedDateRecordNotifier
       remark: remark,
       boatName: r.boatName,
       yard: r.yard,
+      overtime: r.overtime, // 显式构造须逐字段带上，漏了会丢加班标记
     );
   }
 
@@ -197,26 +198,30 @@ class SelectedDateRecordNotifier
     _scheduleSave();
   }
 
-  /// 切换「加班」标记：勾选 → 备注追加『加班』；取消 → 从备注移除。
+  /// 切换「加班」标记。
   ///
-  /// 复用 [WorkRecord.isOvertime] 的既有判定（备注含『加班/加时/加』），
-  /// 因此明细页加班角标、统计页加班班次、月报全部自动生效，无需数据迁移；
-  /// 与导入侧 excel_importer 的 `_mergeOvertimeRemark` 写法保持一致
-  /// （分隔符统一用「·」，如「叉车·加班」）。
+  /// 加班标记写在 [WorkRecord.overtime] 独立字段，**不再往备注里塞「加班」二字**——
+  /// 否则备注里手填的「加班费另算」「晚上加班装车」这类内容会与标记纠缠不清：
+  /// 判定用 contains（模糊）而删除只能匹配独立分段（精确），两套规则对不齐时
+  /// 按钮就会「取消不掉」。独立字段后，备注随便填都不影响加班判定。
+  ///
+  /// 取消时额外清理历史遗留的独立「加班」分段（升级前的数据把标记写在备注里），
+  /// 但只删恰好等于「加班」的分段，备注里的其他原话原样保留。
   void toggleOvertime(bool value) {
     final current = state.value;
     if (current == null) return;
     _pushUndo();
-    // 按分隔符切分后剔除「加班」片段再按需追加，
-    // 避免简单 replaceAll 留下『叉车·』尾巴、反复勾选变成『叉车··加班』
-    final parts = (current.remark ?? '')
-        .split('·')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty && e != '加班')
-        .toList();
-    if (value) parts.add('加班');
-    final newRemark = parts.isEmpty ? null : parts.join('·');
-    state = AsyncData(_withRemark(current, newRemark));
+    if (value) {
+      state = AsyncData(current.copyWith(overtime: true));
+    } else {
+      final parts = (current.remark ?? '')
+          .split('·')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty && e != '加班')
+          .toList();
+      final newRemark = parts.isEmpty ? null : parts.join('·');
+      state = AsyncData(_withRemark(current, newRemark).copyWith(overtime: false));
+    }
     _scheduleSave();
   }
 

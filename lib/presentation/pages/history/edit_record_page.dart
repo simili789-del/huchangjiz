@@ -203,17 +203,15 @@ class _EditRecordPageState extends ConsumerState<EditRecordPage> {
   }
 
   Future<void> _save() async {
-    // 「加班」开关并入备注（与 WorkRecord.isOvertime 判定、导入侧写法一致）：
-    // 勾选 → 追加『加班』；取消 → 从备注移除，避免取消后残留旧标记。
-    // 按分隔符切分后剔除『加班』片段再按需追加，
-    // 避免简单 replaceAll 留下『叉车·』尾巴、反复编辑变成『叉车··加班』。
-    final parts = _remark
+    // 「加班」写独立字段 overtime，备注原样保存不再拼「加班」二字：
+    // 手填的「加班费另算」之类备注不会被按钮吞掉，取消加班也一定取消得掉。
+    // 仅清理升级前遗留的独立「加班」分段（那时标记存在备注里），保留其他原话。
+    final remarkParts = _remark
         .split('·')
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty && e != '加班')
         .toList();
-    if (_overtime) parts.add('加班');
-    final remark = parts.isEmpty ? null : parts.join('·');
+    final remark = remarkParts.isEmpty ? null : remarkParts.join('·');
     final updated = WorkRecord(
       id: widget.record.id,
       date: widget.record.date,
@@ -224,6 +222,7 @@ class _EditRecordPageState extends ConsumerState<EditRecordPage> {
       remark: remark,
       boatName: _boatName.isEmpty ? null : _boatName,
       yard: _yard,
+      overtime: _overtime,
     );
     // 按原 id 写入（导入记录 id 是 imp_日期_姓名，不能用按日期覆盖的 saveRecord，
     // 否则会覆盖同日「今日记账」并造成重复统计）。

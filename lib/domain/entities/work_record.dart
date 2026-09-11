@@ -51,6 +51,20 @@ class WorkRecord extends HiveObject {
   @HiveField(8)
   final String? yard;
 
+  /// 加班标记（新增字段，与备注解耦）。
+  ///
+  /// 早期版本把「加班」二字塞进备注来传递标记，导致：
+  /// 判定用模糊匹配（remark 含『加班/加时/加班费』即算加班），
+  /// 而取消按钮只删恰好等于『加班』的分段——两套规则对不齐，
+  /// 备注写成「加班费另算」「晚上加班」这类非独立分段时就取消不掉。
+  /// 现改为独立布尔字段：按钮/编辑页直接写 true/false，备注原样保留，
+  /// 手填的「加班费另算」也不会被吞掉。
+  ///
+  /// null 表示老数据（Hive 无此字段），回退到备注文本推断，
+  /// 保证升级前已保存的记录与导入记录行为不变。
+  @HiveField(9)
+  final bool? overtime;
+
   WorkRecord({
     required this.id,
     required this.date,
@@ -61,6 +75,7 @@ class WorkRecord extends HiveObject {
     this.remark,
     this.boatName,
     this.yard,
+    this.overtime,
   });
 
   WorkRecord copyWith({
@@ -73,6 +88,7 @@ class WorkRecord extends HiveObject {
     String? remark,
     String? boatName,
     String? yard,
+    bool? overtime,
   }) {
     return WorkRecord(
       id: id ?? this.id,
@@ -84,6 +100,7 @@ class WorkRecord extends HiveObject {
       remark: remark ?? this.remark,
       boatName: boatName ?? this.boatName,
       yard: yard ?? this.yard,
+      overtime: overtime ?? this.overtime,
     );
   }
 
@@ -99,7 +116,13 @@ class WorkRecord extends HiveObject {
   /// 是否标记为「加班」：仅备注含「加班 / 加时 / 加班费」或单字「加」才判加班。
   /// 注意：「值班 / 值日 / 值」属于作业类型（与「叉车」并列），不在此判定内，
   /// 否则会与导入侧 exceL_importer 的作业类型归一（叉/叉车→叉车）冲突导致重复统计。
+  /// 是否加班：优先读独立字段 [overtime]；老数据（null）回退到备注推断。
+  ///
+  /// 回退仅用于兼容升级前落库的记录与导入记录：那时还没有 overtime 字段，
+  /// 加班信息就写在备注里。新写入的走独立字段，备注怎么填都不影响判定。
   bool get isOvertime {
+    final o = overtime;
+    if (o != null) return o;
     if (remark == null || remark!.isEmpty) return false;
     final r = remark!;
     return r.contains('加班') ||
