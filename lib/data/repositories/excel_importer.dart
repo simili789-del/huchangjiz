@@ -212,21 +212,26 @@ ExcelParseResult parseXlsx(String path, {String? sheetName, int? headerRow}) {
   // 其余数值列（jobCols）作为该车名的车数。
   var isExcavator = header.boatCol != null;
 
-  // 3) 解析班次与日期（取自表头上一行的 meta 行；逐单元格，支持 Excel 序列日期）
+  // 3) 解析班次与日期（取自表头上方的 meta 区；逐单元格，支持 Excel 序列日期）
+  //
+  // 现场写法多样，常见「2026/9/1夜」把日期和班次连写在一格，
+  // 也有把日期写一行、班次写另一行的（如 行0 日期、行1「夜」），
+  // 只扫 headerIdx-1 一行会漏识别。故向上多扫几行，就近优先（k 越小越优先）。
   DateTime? date;
   var shift = ShiftType.day;
-  if (headerIdx - 1 >= 0) {
-    for (final c in rows[headerIdx - 1]) {
-      final t = _text(c) ?? '';
-      if (t.contains('夜')) {
-        shift = ShiftType.night;
-      } else if (t.contains('白')) {
-        shift = ShiftType.day;
-      }
-      final d = _parseDateCell(c);
-      if (d != null) date = d;
+  ShiftType? metaShift;
+  for (int k = 1; k <= 3; k++) {
+    final mr = headerIdx - k;
+    if (mr < 0) break;
+    for (final c in rows[mr]) {
+      // ??= 保证就近优先：不会被更远的旧表 meta 覆盖
+      metaShift ??= _detectShift(_text(c));
+      date ??= _parseDateCell(c);
     }
+    // 日期与班次都拿到即停，避免继续往上误读上一张表的 meta
+    if (metaShift != null && date != null) break;
   }
+  if (metaShift != null) shift = metaShift;
 
   // 4) 逐行提取人员车数；空姓名行是「合计行/说明行/空行」，需区分
   final result = <ImportedRow>[];
@@ -287,12 +292,9 @@ ExcelParseResult parseXlsx(String path, {String? sheetName, int? headerRow}) {
     }
     final shiftC = header.shiftCol;
     if (shiftC != null) {
-      final s = _text(rows[r][shiftC]) ?? '';
-      if (s.contains('夜')) {
-        shift = ShiftType.night;
-      } else if (s.contains('白')) {
-        shift = ShiftType.day;
-      }
+      // 逐行「班次」列优先，同样走 _detectShift（兼容「晚」= 夜班）
+      final s = _detectShift(_text(rows[r][shiftC]));
+      if (s != null) shift = s;
     }
 
     if (name.isEmpty) {
@@ -595,7 +597,9 @@ DateTime? _parseDateCell(dynamic cell) {
   final v = (cell?.toString() ?? '').trim();
   if (v.isEmpty) return null;
   // 2026-08-12 / 2026/8/12
-  final slash = RegExp(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})').firstMatch(v);
+  // 不再用 ^ 锚定开头：现场常见「南货场绩效表 2026/9/1夜」这类标题里嵌日期的
+  // 写法，锚定开头会让日期整个漏识别（日期被吞 → 落库日期错）。
+  final slash = RegExp(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})').firstMatch(v);
   if (slash != null) {
     return DateTime(
       int.parse(slash.group(1)!),
@@ -634,6 +638,35 @@ DateTime? _parseDateCell(dynamic cell) {
     );
   }
   return DateTime.tryParse(v.replaceAll('/', '-'));
+}
+
+/// 从任意文本里识别班次（白班 / 夜班），识别不出返回 null。
+///
+/// 覆盖现场各种写法（「添加识别夜班规则」）：
+///   夜班 ← 夜 / 晚 / 夜班 / 晚班 / 零点班 / 0点班
+///   白班 ← 白 / 早 / 白班 / 早班 / 日班
+///
+/// 关键：**「晚」等同夜班**。考勤表里 1 号「晚」打勾即夜班出勤，
+/// 绩效表 meta 也常写「2026/9/1晚」。旧代码只认「夜/白」，
+/// 导致写「晚」的表被误判成白班——这是此前「识别不出夜班」的直接原因。
+///
+/// 判定顺序：先判夜班再判白班。因为「夜」「晚」是夜班专属字，
+/// 而「白」「早」「日」是白班专属字，正常文本不会同时出现；
+/// 万一同时出现（如备注「早班转夜班」），以夜班为准更符合"加了夜"的语义。
+ShiftType? _detectShift(String? text) {
+  if (text == null) return null;
+  final t = text.trim();
+  if (t.isEmpty) return null;
+  if (t.contains('夜') ||
+      t.contains('晚') ||
+      t.contains('零点') ||
+      t.contains('0点')) {
+    return ShiftType.night;
+  }
+  if (t.contains('白') || t.contains('早') || t.contains('日班')) {
+    return ShiftType.day;
+  }
+  return null;
 }
 
 /// 把表格里的作业类型列名归一为系统标准类型。
