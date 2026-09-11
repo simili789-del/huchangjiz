@@ -15,6 +15,7 @@ class DefaultJobTypes {
     '神华装车',
     '神华归垛',
     '封垛',
+    '倒箱子',
   ];
 
   static const Map<String, double> defaultPrices = {
@@ -28,6 +29,8 @@ class DefaultJobTypes {
     '神华装车': 1.2,
     '神华归垛': 1.2,
     '封垛': 2.0,
+    // 倒箱子单价固定 1.5 元/车（现场表常只写「1.5元」「1.5元/车」不写作业名）
+    '倒箱子': 1.5,
   };
 
   /// 非常用作业类型：仅少数司机 / 特殊货场才会用到，导入向导与首页「快速记账」
@@ -55,6 +58,7 @@ class DefaultJobTypes {
     '神华装车': Colors.indigo,
     '神华归垛': Colors.deepOrange,
     '封垛': Colors.cyan,
+    '倒箱子': Colors.pink,
   };
 
   static Color colorOf(String jobType) {

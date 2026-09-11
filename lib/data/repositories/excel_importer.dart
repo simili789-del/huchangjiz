@@ -704,6 +704,22 @@ String _canonicalJobType(String name, {double? price}) {
     return '外倒装车';
   }
 
+  // 纯单价列名：现场常把「倒箱子」列整列只写成「1.5元」「1.5元/车」，
+  // 完全没有作业名。1.5 元/车 是倒箱子的专属单价，这里按单价反查归一为
+  // 「倒箱子」，避免作业类型名变成空串或「1.5元」这种不可用的列名。
+  // 剥离 元 / 车 / 斜杠 / 空白 后若只剩一个数字，即视为纯单价列。
+  final strippedPrice = core.replaceAll(RegExp(r'[元/车\s\uFF0F]'), '');
+  double? barePrice;
+  if (strippedPrice.isEmpty) {
+    // 名字被剥空：整格只有价格，单价已由 _cleanColumn 提取进 price
+    barePrice = price;
+  } else if (RegExp(r'^\d+(?:\.\d+)?$').hasMatch(strippedPrice)) {
+    barePrice = double.tryParse(strippedPrice);
+  }
+  if (barePrice != null && (barePrice - 1.5).abs() < 0.01) {
+    return '倒箱子';
+  }
+
   // 字面归一
   switch (core) {
     case '归垛':
@@ -731,6 +747,11 @@ String _canonicalJobType(String name, {double? price}) {
     case '内倒装车':
       return '内倒装车';
   }
+  // 倒箱子（独立作业类型，1.5 元/车）。
+  // 必须在下方「倒货 / 外倒 / 内倒」等含「倒」字的规则之前判断，
+  // 否则「倒箱子」会被误归到外倒装车或内倒装车。
+  if (core.contains('倒箱')) return '倒箱子';
+
   // 挖掘机加高：含「加高」的列名（如「加高（车）」）→ 挖掘机加高
   if (core.contains('加高')) return '挖掘机加高';
   // 端货：铲车作业中的端货作业，归入内倒装车（端货是内倒装车的一种）
@@ -827,7 +848,11 @@ CleanedColumn _cleanColumn(String raw) {
       price,
     );
   }
-  return CleanedColumn(_canonicalJobType(raw.trim()), null);
+  final name = _canonicalJobType(raw.trim());
+  // 「倒箱子」单价固定 1.5 元/车：现场表常只写「倒箱子」「1.5元/车」而不再
+  // 标单价，这里补默认值，保证导入后该作业类型单价不为空。
+  if (name == '倒箱子') return CleanedColumn(name, 1.5);
+  return CleanedColumn(name, null);
 }
 
 /// 把一行表头解析为 [_HeaderInfo]（姓名/车号/备注/船名/日期/班次/加班 + 作业列）。
