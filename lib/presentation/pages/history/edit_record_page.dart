@@ -27,6 +27,8 @@ class _EditRecordPageState extends ConsumerState<EditRecordPage> {
   late Map<String, int> _jobQuantities;
   late String _remark;
   late String? _yard;
+  /// 「加班」标记：勾选时并入备注『加班』（与 WorkRecord.isOvertime 判定一致）。
+  late bool _overtime;
 
   @override
   void initState() {
@@ -38,6 +40,7 @@ class _EditRecordPageState extends ConsumerState<EditRecordPage> {
     _jobQuantities = Map<String, int>.from(widget.record.jobQuantities);
     _remark = widget.record.remark ?? '';
     _yard = widget.record.yard;
+    _overtime = widget.record.isOvertime;
   }
 
   @override
@@ -107,6 +110,28 @@ class _EditRecordPageState extends ConsumerState<EditRecordPage> {
             ],
             selected: {_shift},
             onSelectionChanged: (s) => setState(() => _shift = s.first),
+          ),
+          const SizedBox(height: 8),
+          // 「加班」开关：附加在白班/夜班之后，勾选时备注并入『加班』，
+          // 与首页快速记账、明细页加班角标、统计页加班班次联动。
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilterChip(
+              selected: _overtime,
+              label: const Text('加班'),
+              avatar: Icon(
+                Icons.more_time,
+                size: 18,
+                color: _overtime ? Colors.white : Colors.red,
+              ),
+              selectedColor: Colors.red,
+              checkmarkColor: Colors.white,
+              labelStyle: TextStyle(
+                color: _overtime ? Colors.white : null,
+                fontWeight: FontWeight.w600,
+              ),
+              onSelected: (v) => setState(() => _overtime = v),
+            ),
           ),
           const SizedBox(height: 12),
           Padding(
@@ -178,6 +203,17 @@ class _EditRecordPageState extends ConsumerState<EditRecordPage> {
   }
 
   Future<void> _save() async {
+    // 「加班」开关并入备注（与 WorkRecord.isOvertime 判定、导入侧写法一致）：
+    // 勾选 → 追加『加班』；取消 → 从备注移除，避免取消后残留旧标记。
+    // 按分隔符切分后剔除『加班』片段再按需追加，
+    // 避免简单 replaceAll 留下『叉车·』尾巴、反复编辑变成『叉车··加班』。
+    final parts = _remark
+        .split('·')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty && e != '加班')
+        .toList();
+    if (_overtime) parts.add('加班');
+    final remark = parts.isEmpty ? null : parts.join('·');
     final updated = WorkRecord(
       id: widget.record.id,
       date: widget.record.date,
@@ -185,7 +221,7 @@ class _EditRecordPageState extends ConsumerState<EditRecordPage> {
       vehicleNo: _vehicleNo,
       shift: _shift,
       jobQuantities: _jobQuantities,
-      remark: _remark,
+      remark: remark,
       boatName: _boatName.isEmpty ? null : _boatName,
       yard: _yard,
     );

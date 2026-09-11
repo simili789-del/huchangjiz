@@ -151,6 +151,29 @@ class SelectedDateRecordNotifier
     _scheduleSave();
   }
 
+  /// 切换「加班」标记：勾选 → 备注追加『加班』；取消 → 从备注移除。
+  ///
+  /// 复用 [WorkRecord.isOvertime] 的既有判定（备注含『加班/加时/加』），
+  /// 因此明细页加班角标、统计页加班班次、月报全部自动生效，无需数据迁移；
+  /// 与导入侧 excel_importer 的 `_mergeOvertimeRemark` 写法保持一致
+  /// （分隔符统一用「·」，如「叉车·加班」）。
+  void toggleOvertime(bool value) {
+    final current = state.value;
+    if (current == null) return;
+    _pushUndo();
+    // 按分隔符切分后剔除「加班」片段再按需追加，
+    // 避免简单 replaceAll 留下『叉车·』尾巴、反复勾选变成『叉车··加班』
+    final parts = (current.remark ?? '')
+        .split('·')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty && e != '加班')
+        .toList();
+    if (value) parts.add('加班');
+    final newRemark = parts.isEmpty ? null : parts.join('·');
+    state = AsyncData(current.copyWith(remark: newRemark));
+    _scheduleSave();
+  }
+
   /// 一键复制昨日数据到当前选中日期。
   Future<void> copyYesterday() async {
     final yesterday = _date.subtract(const Duration(days: 1));

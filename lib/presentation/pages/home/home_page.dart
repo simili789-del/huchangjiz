@@ -123,6 +123,10 @@ class _HomeBody extends ConsumerWidget {
             onChanged: (s) => ref
                 .read(selectedDateRecordProvider.notifier)
                 .updateBasicInfo(shift: s),
+            isOvertime: record.isOvertime,
+            onOvertimeChanged: (v) => ref
+                .read(selectedDateRecordProvider.notifier)
+                .toggleOvertime(v),
           ),
           const SizedBox(height: 8),
           ...regularTypes.map((jobType) => JobTypeCard(
@@ -413,8 +417,17 @@ class _SummaryCards extends ConsumerWidget {
 class _ShiftSelector extends StatelessWidget {
   final ShiftType shift;
   final ValueChanged<ShiftType> onChanged;
+  /// 「加班」开关：与白班/夜班并列展示，但语义是附加标记而非第三种班次
+  /// （加班仍归属所选班次，统计里按该班次参与白/夜分类并计入加班）。
+  final bool isOvertime;
+  final ValueChanged<bool> onOvertimeChanged;
 
-  const _ShiftSelector({required this.shift, required this.onChanged});
+  const _ShiftSelector({
+    required this.shift,
+    required this.onChanged,
+    required this.isOvertime,
+    required this.onOvertimeChanged,
+  });
 
   Widget _tile(
     BuildContext context,
@@ -457,6 +470,45 @@ class _ShiftSelector extends StatelessWidget {
     );
   }
 
+  /// 「加班」tile：与白班/夜班并列，但点击是切换开关（非三选一）。
+  /// 勾选后备注追加『加班』，明细页显示红色加班角标、统计页计入加班班次。
+  Widget _overtimeTile(BuildContext context) {
+    const active = Colors.red;
+    final selected = isOvertime;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onOvertimeChanged(!isOvertime),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: selected ? active : active.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? active : active.withOpacity(0.35),
+              width: 2,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.more_time,
+                  color: selected ? Colors.white : active, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                '加班',
+                style: TextStyle(
+                  color: selected ? Colors.white : active,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -464,9 +516,11 @@ class _ShiftSelector extends StatelessWidget {
       child: Row(
         children: [
           _tile(context, ShiftType.day, '白班', Icons.wb_sunny, Colors.orange),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           _tile(
               context, ShiftType.night, '夜班', Icons.nights_stay, Colors.indigo),
+          const SizedBox(width: 8),
+          _overtimeTile(context),
         ],
       ),
     );
