@@ -37,7 +37,7 @@ class AppSettings extends HiveObject {
   final List<String> revealedAdvancedTypes;
 
   /// 被隐藏的（普通/手动添加）作业类型。勾选取消即加入，首页常规区不再显示。
-  /// 与 revealedAdvancedTypes 区分：后者管「其他作业类型」5 个固定高级类型的显隐，
+  /// 与 revealedAdvancedTypes 区分：后者管「其他作业类型」固定高级类型的显隐，
   /// 本字段管其余可手动添加类型的显隐，二者互不干扰。
   @HiveField(9, defaultValue: <String>[])
   final List<String> hiddenJobTypes;
