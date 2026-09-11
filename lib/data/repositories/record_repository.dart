@@ -36,6 +36,13 @@ class RecordRepository {
     await _box.put(_dateKey(record.date), record);
   }
 
+  /// 删除某日期的「今日记账」表单记录（纯日期主键）。
+  /// 仅删除表单自己那条；导入记录（imp_ 前缀复合主键）不受影响。
+  /// 用于车数清零后自动清理，避免明细页残留「0车」垃圾条目。
+  Future<void> deleteFormRecord(DateTime date) async {
+    await _box.delete(_dateKey(date));
+  }
+
   /// 批量写入导入记录。使用「imp_日期_姓名」复合主键，与「今日记账」的纯日期
   /// 主键空间隔离，多人同日互不覆盖；同一人同日重复出现（如挖掘机表同名多船、
   /// 多段合计）时自动合并车数、拼接备注，避免后写覆盖先写导致丢数。

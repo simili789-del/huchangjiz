@@ -51,13 +51,38 @@ class SelectedDateRecordNotifier
   /// App 被系统回收导致当日手填数据丢失。
   Timer? _saveDebounce;
 
+  /// 表单记录是否含有实质内容（值得落库）。
+  ///
+  /// 车数任一 > 0、手填备注（剔除纯『加班』标记）、船名，三者其一即算。
+  /// 纯『加班』标记不算实质内容：只勾了加班还没录车数就落库，会在明细页
+  /// 留下「0车」垃圾条目（金额必为 0）。
+  bool _hasSubstance(WorkRecord r) {
+    if (r.jobQuantities.values.any((v) => v > 0)) return true;
+    final remarkParts = (r.remark ?? '')
+        .split('·')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty && e != '加班')
+        .toList();
+    if (remarkParts.isNotEmpty) return true;
+    return (r.boatName ?? '').trim().isNotEmpty;
+  }
+
   /// 字段改动后触发防抖落盘（不清除撤销栈，保留撤销能力）。
+  ///
+  /// 车数全 0 且无其他实质内容的表单不落库，反向删除当天表单记录——
+  /// 顺带清掉此前版本误存的「0车」残留，也覆盖「把车数改回 0 =
+  /// 想删掉这条」的操作意图。仅删表单自己的纯日期主键，
+  /// imp_ 前缀的导入记录不受影响。
   void _scheduleSave() {
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 800), () {
       final cur = state.value;
       if (cur == null) return;
-      _repository.saveRecord(cur);
+      if (_hasSubstance(cur)) {
+        _repository.saveRecord(cur);
+      } else {
+        _repository.deleteFormRecord(cur.date);
+      }
       // H2：只需失效全量快照根，所有派生 Provider（今日摘要/上次详情/明细/
       // 月报等）会级联失效，无需再手写一长串 invalidate。
       _ref.invalidate(allRecordsProvider);
@@ -143,11 +168,32 @@ class SelectedDateRecordNotifier
     _scheduleSave();
   }
 
+  /// 显式构造「仅备注不同」的新记录。
+  ///
+  /// 不能用 [WorkRecord.copyWith]：其 remark 参数是 `remark ?? this.remark`，
+  /// 传 null 会被忽略、保留旧备注——这曾导致「取消加班」「清空备注」
+  /// 两个操作看起来完全无效（点一下选中、再点取消，勾一直亮着）。
+  /// 显式 new 才能让 remark=null 真正写进实体。
+  WorkRecord _withRemark(WorkRecord r, String? remark) {
+    return WorkRecord(
+      id: r.id,
+      date: r.date,
+      workerName: r.workerName,
+      vehicleNo: r.vehicleNo,
+      shift: r.shift,
+      jobQuantities: r.jobQuantities,
+      remark: remark,
+      boatName: r.boatName,
+      yard: r.yard,
+    );
+  }
+
   void updateRemark(String remark) {
     final current = state.value;
     if (current == null) return;
     _pushUndo();
-    state = AsyncData(current.copyWith(remark: remark));
+    final t = remark.trim();
+    state = AsyncData(_withRemark(current, t.isEmpty ? null : t));
     _scheduleSave();
   }
 
@@ -170,7 +216,7 @@ class SelectedDateRecordNotifier
         .toList();
     if (value) parts.add('加班');
     final newRemark = parts.isEmpty ? null : parts.join('·');
-    state = AsyncData(current.copyWith(remark: newRemark));
+    state = AsyncData(_withRemark(current, newRemark));
     _scheduleSave();
   }
 
@@ -194,7 +240,13 @@ class SelectedDateRecordNotifier
   Future<void> save() async {
     final current = state.value;
     if (current == null) return;
-    await _repository.saveRecord(current);
+    // 与自动保存同一套判定：无实质内容（全 0 车且无备注/船名）不落库，
+    // 反向删除，避免明细页残留「0车」记录。
+    if (_hasSubstance(current)) {
+      await _repository.saveRecord(current);
+    } else {
+      await _repository.deleteFormRecord(current.date);
+    }
     _undoStack.clear();
     state = AsyncData(current);
     // H2：失效全量快照根即可，派生 Provider 自动级联刷新
